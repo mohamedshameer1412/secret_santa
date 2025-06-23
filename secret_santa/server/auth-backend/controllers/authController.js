@@ -23,3 +23,42 @@ res.clearCookie('token', {
 
 res.status(200).json({ message: 'Logged out' });
 
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { sendEmail } = require('../utils/sendEmail');
+
+// REGISTER
+exports.registerUser = async (req, res) => {
+  // TODO: validate input, hash password, save user, send verification email
+};
+
+// VERIFY EMAIL
+exports.verifyEmail = async (req, res) => {
+  // TODO: decode token, activate user
+};
+
+// LOGIN
+exports.loginUser = async (req, res) => {
+  // TODO: check user, match password, generate JWT, set cookie
+};
+
+// LOGOUT
+exports.logoutUser = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+  });
+  res.json({ message: 'Logged out' });
+};
+
+// FORGOT PASSWORD
+exports.forgotPassword = async (req, res) => {
+  // TODO: generate reset token, send reset email
+};
+
+// RESET PASSWORD
+exports.resetPassword = async (req, res) => {
+  // TODO: verify token, set new hashed password
+};
