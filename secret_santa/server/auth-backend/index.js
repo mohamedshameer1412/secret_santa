@@ -1,28 +1,41 @@
-const cookieParser = require('cookie-parser');
-app.use(cookieParser());
-
 const express = require('express');
 const mongoose = require('mongoose');
+const dotenv = require('dotenv');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');
-require('dotenv').config();
-
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
-const errorHandler = require('./middleware/error');
+const eventRoutes = require('./routes/eventRoutes');
+const { errorHandler } = require('./middleware/errorHandler');
 
+// Load environment variables
+dotenv.config();
+
+// Initialize app
 const app = express();
 
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+// Middleware
 app.use(express.json());
-app.use(cookieParser());
+app.use(cors());
 
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('MongoDB Connected'))
+.catch(err => {
+  console.error('MongoDB Connection Error:', err);
+  process.exit(1);
+});
+
+// Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/user', userRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/events', eventRoutes);
+
+// Error handler middleware
 app.use(errorHandler);
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    app.listen(5000, () => console.log('Server running on port 5000'));
-  })
-  .catch(err => console.error(err));
+// Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
