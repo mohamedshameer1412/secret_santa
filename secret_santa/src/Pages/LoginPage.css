@@ -150,3 +150,27 @@ body {
 .password-toggle:hover {
     transform: translateY(-50%) scale(1.1);
 }
+
+/* Default - Desktop view (image fills the left side as normal) */
+.image-container {
+    display: flex;
+    align-items: flex-end; /* Align to bottom */
+    justify-content: center;
+}
+
+.santa-image {
+    object-fit: cover;
+}
+
+/* Image half overlaps below form on mobile */
+@media (max-width: 767.98px) {
+    .image-container {
+        margin-bottom: -80px; /* Controls the overlap */
+        z-index: 5;
+    }
+    .image-container img {
+        height: 150px; /* Adjust based on your design */
+        width: 90% !important;
+        object-fit: contain; /* Optional: keep image aspect ratio */
+    }
+}

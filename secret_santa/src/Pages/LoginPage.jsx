@@ -46,23 +46,25 @@ const LoginPage = () => {
 
     return (
         <div className="login-page d-flex align-items-center justify-content-center p-2">
-            <div className="row justify-content-center align-items-center shadow-lg rounded-4 p-2 overflow-hidden glossy glass-effect login-container">
+            <div className="row justify-content-center align-items-center shadow-lg rounded-4 p-0 p-md-2 overflow-hidden glossy glass-effect login-container">
 
                 {/* Image Side */}
-                <div className="col-md-5 p-0 h-100">
+                <div className="col-md-5 p-0 h-100 image-container">
                     <img
                         src="src/assets/santa-bg.png"
                         alt="Santa Claus"
-                        className="img-fluid h-100 w-100"
+                        className="img-fluid h-100 w-100 rounded-4 m-3 border border-white border-5  shadow-lg"
                         style={{ objectFit: 'cover' }}
                     />
                 </div>
 
                 {/* Form Side */}
-                <div className="col-md-6 p-5 text-start glass-effect animate-slide m-4">
+                <div className="col-md-6 p-5 text-start glass-effect animate-slide m-4 border border-white border-5 shadow-lg">
                     <h2 className="fw-bold mb-4 text-danger">
-                        <img src="src/assets/logo.png" width={50} alt="Santa Icon" className="me-2" />
-                        Secret Santa Login
+                        <img src="src/assets/logo.png" width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
+                        <span className="d-block d-md-none"><br /></span>
+                        Secret Santa                         <span className="d-block mt-3"></span> 
+                        Login
                     </h2>
                     <p className="text-muted mb-4">Join the holiday fun and surprise your friend with a gift!</p>
 
