@@ -8,28 +8,16 @@ const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true
 });
 
-// Add auth token to requests if available
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers['x-auth-token'] = token;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Handle response errors globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     // Handle auth errors (redirect to login)
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
+      // No need to remove token from localStorage
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -38,13 +26,9 @@ api.interceptors.response.use(
 
 // Auth service functions
 const authService = {
-  // Login user
   login: async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-      }
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Failed to login' };
@@ -61,15 +45,21 @@ const authService = {
     }
   },
 
-  // Logout user
-  logout: () => {
-    localStorage.removeItem('token');
+  // Logout user - call server to clear cookie
+  logout: async () => {
+    try {
+      await api.get('/auth/logout');
+      return true;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to logout' };
+    }
   },
 
   // Get current user profile
   getCurrentUser: async () => {
     try {
-      const response = await api.get('/users/me');
+      // Updated to match your backend route
+      const response = await api.get('/auth/me');
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Failed to get user profile' };
