@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
+const { body, param, validationResult } = require('express-validator');
 const authController = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
@@ -23,7 +23,7 @@ router.post(
       .isLength({ min: 6 })
       .withMessage('Password must be at least 6 characters long')
   ],
-  validate, // Use the reusable middleware
+  validate,
   authController.register
 );
 
@@ -34,34 +34,45 @@ router.post(
     body('email').isEmail().withMessage('Please include a valid email'),
     body('password').exists().withMessage('Password is required')
   ],
-  validate, // Use the reusable middleware
+  validate,
   authController.login
 );
 
-// Email verification
-router.get('/verify/:token', authController.verifyEmail);
+// Email verification with token validation
+router.get(
+  '/verify/:token',
+  [
+    param('token').isLength({ min: 40, max: 40 }).withMessage('Invalid verification token')
+  ],
+  validate,
+  authController.verifyEmail
+);
 
 // Forgot password
 router.post(
   '/forgot-password',
   [body('email').isEmail().withMessage('Please include a valid email')],
-  validate, // Use the reusable middleware
+  validate,
   authController.forgotPassword
 );
 
-// Reset password
+// Reset password with token validation
 router.post(
   '/reset-password/:token',
   [
+    param('token').isLength({ min: 40, max: 40 }).withMessage('Invalid reset token'),
     body('password')
       .isLength({ min: 6 })
       .withMessage('Password must be at least 6 characters long')
   ],
-  validate, // Use the reusable middleware
+  validate,
   authController.resetPassword
 );
 
-// Logout route - consider adding protection middleware
-router.get('/logout', authController.logout);
+// Protected routes
+router.get('/logout', protect, authController.logout);
+
+// Get current user profile (new route)
+router.get('/me', protect, authController.getCurrentUser);
 
 module.exports = router;
