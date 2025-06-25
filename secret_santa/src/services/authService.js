@@ -36,12 +36,18 @@ const authService = {
   },
 
   // Register user
-  register: async (name, email, password) => {
+  register: async (fullName, email, password) => {
     try {
-      const response = await api.post('/auth/register', { name, email, password });
-      return response.data;
+        // Map fullName to name for the backend
+        const response = await api.post('/auth/register', { 
+        name: fullName,  // This is the key fix!
+        email, 
+        password 
+        });
+        return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Failed to register' };
+        console.error("Registration error:", error);  // Add for debugging
+        throw error.response?.data || { message: 'Failed to register' };
     }
   },
 

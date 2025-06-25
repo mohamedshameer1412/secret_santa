@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import authService from '../services/authService';
 import './LoginPage.css';
 
 const SignupPage = () => {
@@ -10,14 +11,28 @@ const SignupPage = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
 
-    const handleSignup = (e) => {
+    const handleSignup = async (e) => {
         e.preventDefault();
         if (password !== confirmPassword) {
             alert('Passwords do not match!');
             return;
         }
-        alert('Signup Successful!');
+
+        setIsLoading(true);
+        try {
+            console.log("Submitting registration with:", { fullName, email }); // Log what we're sending
+            await authService.register(fullName, email, password);
+            alert('Account created!');
+            navigate('/login');
+        } catch (err) {
+            console.error("Full error object:", err);  // Log the full error
+            alert(`Error: ${err.message || 'Registration failed'}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -144,8 +159,13 @@ const SignupPage = () => {
                             </div>
                         </div>
 
-                        <button type="submit" className="btn glossy-btn w-100 fw-bold rounded-3 py-2">
-                            <i className="fa-solid fa-gift me-2"></i>Sign Up
+                        <button
+                            type="submit"
+                            className="btn glossy-btn w-100 fw-bold rounded-3 py-2"
+                            disabled={isLoading}
+                        >
+                            <i className="fa-solid fa-gift me-2"></i>
+                            {isLoading ? 'Signing Up...' : 'Sign Up'}
                         </button>
                     </form>
 

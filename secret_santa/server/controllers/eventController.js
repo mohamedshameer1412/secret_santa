@@ -59,6 +59,35 @@ exports.getMyEvents = async (req, res) => {
   }
 };
 
+// Join an event
+exports.joinEvent = async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const userId = req.user.id;
+    
+    // Find the event
+    const event = await Event.findById(eventId);
+    
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Check if user is already in participants
+    if (event.participants.includes(userId)) {
+      return res.status(400).json({ message: 'You are already participating in this event' });
+    }
+    
+    // Add user to participants
+    event.participants.push(userId);
+    await event.save();
+    
+    res.status(200).json({ message: 'Successfully joined event', event });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Get events user is participating in
 exports.getParticipatingEvents = async (req, res) => {
   try {
