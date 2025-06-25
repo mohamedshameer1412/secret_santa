@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import './LoginPage.css'; // Custom styles
 
@@ -107,7 +108,7 @@ const LoginPage = () => {
                         </div>
 
                         <div className="d-flex justify-content-between align-items-center mb-4">
-                            <a href="#" className="custom-link small">Forgot Password?</a>
+                            <Link to="/forgot-password" className="custom-link small">Forgot Password?</Link>
                         </div>
 
                         <button
@@ -119,7 +120,7 @@ const LoginPage = () => {
                     </form>
 
                     <p className="mt-4 text-muted small">
-                        Don't have an account? <a href="/signup" className="custom-link">Sign up</a>
+                        Don't have an account? <Link to="/signup" className="custom-link">Sign up</Link>
                     </p>
                 </div>
             </div>

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import './LoginPage.css';
 
 const ForgotPasswordPage = () => {
+    const navigate = useNavigate();
     const [email, setEmail] = useState('');
 
     const handleForgotPassword = (e) => {
         e.preventDefault();
         alert('Password reset link sent to your email!');
+        navigate('/reset-password');
     };
 
     return (
@@ -55,7 +58,7 @@ const ForgotPasswordPage = () => {
                     </form>
 
                     <p className="mt-4 text-muted small">
-                        Remembered your password? <a href="/login" className="custom-link">Login</a>
+                        Remembered your password? <Link to="/login" className="custom-link">Login</Link>
                     </p>
                 </div>
             </div>
