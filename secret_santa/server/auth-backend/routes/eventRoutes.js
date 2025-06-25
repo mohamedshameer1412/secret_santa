@@ -1,41 +1,66 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { body, param, validationResult } = require('express-validator');
 const eventController = require('../controllers/eventController');
+const { protect } = require('../middleware/auth');
 
-// Create a new event
-router.post('/', auth, eventController.createEvent);
+// Validation middleware
+const validate = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+  next();
+};
 
-// Get all events organized by the user
-router.get('/my-events', auth, eventController.getMyEvents);
+// Create event validation
+router.post(
+  '/',
+  protect,
+  [
+    body('name').trim().not().isEmpty().withMessage('Event name is required'),
+    body('date').isDate().withMessage('Valid event date is required'),
+    body('budget').optional().isFloat({ min: 0 }).withMessage('Budget must be a positive number'),
+    body('participants').optional().isArray().withMessage('Participants must be an array')
+  ],
+  validate,
+  eventController.createEvent
+);
 
-// Get events user is participating in
-router.get('/participating', auth, eventController.getParticipatingEvents);
+// Join event validation
+router.post(
+  '/join/:eventId',
+  protect,
+  [
+    param('eventId').isMongoId().withMessage('Invalid event ID')
+  ],
+  validate,
+  eventController.joinEvent
+);
 
-// Get a single event
-router.get('/:id', auth, eventController.getEvent);
+// Update event validation
+router.put(
+  '/:id',
+  protect,
+  [
+    param('id').isMongoId().withMessage('Invalid event ID'),
+    body('name').optional().trim().not().isEmpty().withMessage('Event name cannot be empty'),
+    body('date').optional().isDate().withMessage('Valid event date is required'),
+    body('budget').optional().isFloat({ min: 0 }).withMessage('Budget must be a positive number')
+  ],
+  validate,
+  eventController.updateEvent
+);
 
-// Draw names for Secret Santa
-router.post('/:id/draw', auth, eventController.drawNames);
-
-// ADDITIONAL ENDPOINTS
-
-// Allow participants to confirm participation
-router.post('/:id/confirm', auth, eventController.confirmParticipation);
-
-// Update participant wishlist
-router.put('/:eventId/wishlist', auth, eventController.updateWishlist);
-
-// Update event details
-router.put('/:id', auth, eventController.updateEvent);
-
-// Delete an event
-router.delete('/:id', auth, eventController.deleteEvent);
-
-// Add additional participants
-router.post('/:id/participants', auth, eventController.addParticipants);
-
-// Remove a participant
-router.delete('/:eventId/participants/:participantId', auth, eventController.removeParticipant);
+// Get single event
+router.get(
+  '/:id',
+  protect,
+  [
+    param('id').isMongoId().withMessage('Invalid event ID')
+  ],
+  validate,
+  eventController.getEvent
+);
 
 module.exports = router;

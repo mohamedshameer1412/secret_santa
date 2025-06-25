@@ -1,4 +1,9 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { sendEmail } = require('../utils/sendEmail');
 
 // After verifying email and password...
 const jwtToken = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
@@ -22,12 +27,6 @@ res.clearCookie('token', {
 });
 
 res.status(200).json({ message: 'Logged out' });
-
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const { sendEmail } = require('../utils/sendEmail');
 
 // Register a new user
 exports.register = async (req, res) => {

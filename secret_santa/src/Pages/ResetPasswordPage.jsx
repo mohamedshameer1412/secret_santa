@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import './LoginPage.css';
 
 const ResetPasswordPage = () => {
@@ -92,7 +93,7 @@ const ResetPasswordPage = () => {
                     </form>
 
                     <p className="mt-4 text-muted small">
-                        Go back to <a href="/login" className="custom-link">Login</a>
+                        Go back to <Link to="/login" className="custom-link">Login</Link>
                     </p>
                 </div>
             </div>

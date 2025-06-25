@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import './LoginPage.css';
 
 const SignupPage = () => {
@@ -149,7 +150,7 @@ const SignupPage = () => {
                     </form>
 
                     <p className="mt-4 text-muted small">
-                        Already have an account? <a href="/login" className="custom-link">Login</a>
+                        Already have an account? <Link to="/login" className="custom-link">Login</Link>
                     </p>
                 </div>
             </div>
