@@ -15,9 +15,10 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle auth errors (redirect to login)
-    if (error.response && error.response.status === 401) {
-      // No need to remove token from localStorage
+    // Don't redirect for auth check requests
+    const isAuthCheck = error.config.url.includes('/auth/me');
+    
+    if (error.response?.status === 401 && !isAuthCheck) {
       window.location.href = '/login';
     }
     return Promise.reject(error);
