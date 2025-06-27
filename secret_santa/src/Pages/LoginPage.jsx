@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+import { useAuth } from '../context/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import './LoginPage.css'; // Custom styles
@@ -8,6 +10,10 @@ const LoginPage = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const confettiInterval = useRef(null);
+    const { login } = useAuth();
+    const navigate = useNavigate();
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
     // Continuous Snowfall Animation
     const launchConfettiLoop = () => {
@@ -34,14 +40,21 @@ const LoginPage = () => {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-
-        if (email === 'santa@example.com' && password === 'secret123') {
+        setError('');
+        setIsLoading(true);
+        
+        try {
+            await login(email, password);
             launchConfettiLoop();
-        } else {
-            alert('Invalid email or password!');
+            // Redirect to dashboard after successful login
+            navigate('/dashboard');
+        } catch (err) {
+            setError(err.message || 'Failed to login');
             stopConfetti();
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -70,6 +83,11 @@ const LoginPage = () => {
                     <p className="text-muted mb-4">Join the holiday fun and surprise your friend with a gift!</p>
 
                     <form onSubmit={handleSubmit}>
+                        {error && (
+                            <div className="alert alert-danger" role="alert">
+                                {error}
+                            </div>
+                        )}
                         <div className="mb-3">
                             <label htmlFor="email" className="form-label text-success">
                                 <i className="fa-solid fa-envelope me-2"></i>Email address
@@ -114,8 +132,18 @@ const LoginPage = () => {
                         <button
                             type="submit"
                             className="btn glossy-btn w-100 fw-bold rounded-3 py-2"
+                            disabled={isLoading}
                         >
-                            <i className="fa-solid fa-gift me-2"></i>Login to Secret Santa
+                            {isLoading ? (
+                                <>
+                                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Logging in...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="fa-solid fa-gift me-2"></i>Login to Secret Santa
+                                </>
+                            )}
                         </button>
                     </form>
 

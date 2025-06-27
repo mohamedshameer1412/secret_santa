@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../context/useAuth';
 import './LoginPage.css';
 
 const ResetPasswordPage = () => {
@@ -7,14 +8,36 @@ const ResetPasswordPage = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { token } = useParams();
+    const navigate = useNavigate();
+    const { resetPassword } = useAuth();
 
-    const handleResetPassword = (e) => {
+    const handleResetPassword = async (e) => {
         e.preventDefault();
+        setError('');
+        
         if (newPassword !== confirmPassword) {
-            alert('Passwords do not match!');
+            setError('Passwords do not match!');
             return;
         }
-        alert('Password successfully reset!');
+
+        try {
+            await resetPassword(token, newPassword);
+            setError(''); 
+            
+            const successElement = document.createElement('div');
+            successElement.className = 'alert alert-success';
+            successElement.textContent = 'Password reset successful! Redirecting to login...';
+            document.querySelector('form').prepend(successElement);
+            
+            setTimeout(() => navigate('/login'), 3000);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to reset password');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -43,6 +66,11 @@ const ResetPasswordPage = () => {
                     <p className="text-muted mb-4">Enter your new password</p>
 
                     <form onSubmit={handleResetPassword}>
+                        {error && (
+                            <div className="alert alert-danger" role="alert">
+                                {error}
+                            </div>
+                        )}
                         <div className="mb-3 position-relative">
                             <label htmlFor="newPassword" className="form-label text-success">
                                 <i className="fa-solid fa-lock me-2"></i> New Password
@@ -87,8 +115,13 @@ const ResetPasswordPage = () => {
                             />
                         </div>
 
-                        <button type="submit" className="btn glossy-btn w-100 fw-bold rounded-3 py-2">
-                            <i className="fa-solid fa-key me-2"></i>Reset Password
+                        <button
+                            type="submit"
+                            className="btn glossy-btn w-100 fw-bold rounded-3 py-2"
+                            disabled={isLoading}
+                        >
+                            <i className="fa-solid fa-key me-2"></i>
+                            {isLoading ? 'Resetting...' : 'Reset Password'}
                         </button>
                     </form>
 

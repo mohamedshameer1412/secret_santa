@@ -64,21 +64,26 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
 
+    user.isVerified = true;
     await user.save();
 
     // Send verification email
-    const verificationURL = `${req.protocol}://${req.get('host')}/api/auth/verify/${verificationToken}`;
-    const message = `
-      <h1>Email Verification</h1>
-      <p>Please click the link below to verify your email address:</p>
-      <a href="${verificationURL}" target="_blank">Verify Email</a>
-    `;
+    try {
+  const verificationURL = `${req.protocol}://${req.get('host')}/api/auth/verify/${verificationToken}`;
+  const message = `
+    <h1>Email Verification</h1>
+    <p>Please click the link below to verify your email address:</p>
+    <a href="${verificationURL}" target="_blank">Verify Email</a>
+  `;
 
-    await sendEmail(user.email, 'Please verify your email address', message);
+  await sendEmail(user.email, 'Please verify your email address', message);
+} catch (emailError) {
+  console.error("Email sending failed:", emailError);
+}
 
-    res.status(201).json({ 
-      message: 'User registered successfully. Please verify your email.' 
-    });
+res.status(201).json({ 
+  message: 'User registered successfully. You can now log in.' 
+});
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -113,12 +118,22 @@ exports.verifyEmail = async (req, res) => {
 };
 
 // Login user
+// Login user
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    // Debug logging
+    console.log('Login attempt:', email);
 
-    // Check if user exists
-    const user = await User.findOne({ email });
+    // Use case-insensitive email search
+    const user = await User.findOne({ 
+      email: { $regex: new RegExp(`^${email}$`, 'i') } 
+    });
+    
+    // Debug logging
+    console.log('User found:', user ? 'Yes' : 'No');
+    
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -130,6 +145,8 @@ exports.login = async (req, res) => {
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log('Password match:', isMatch ? 'Yes' : 'No');
+    
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -223,6 +240,8 @@ exports.resetPassword = async (req, res) => {
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
+    
+    user.isVerified = true;
     
     // Clear reset token fields
     user.resetPasswordToken = undefined;
