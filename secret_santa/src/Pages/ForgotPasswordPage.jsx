@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import './LoginPage.css';
 
 const ForgotPasswordPage = () => {
-    const navigate = useNavigate();
     const [email, setEmail] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { forgotPassword } = useAuth();
 
-    const handleForgotPassword = (e) => {
+    const handleForgotPassword = async (e) => {
         e.preventDefault();
-        alert('Password reset link sent to your email!');
-        navigate('/reset-password');
+        setError('');
+        setIsLoading(true);
+        
+        try {
+            await forgotPassword(email);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to send reset email');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -52,8 +63,19 @@ const ForgotPasswordPage = () => {
                             />
                         </div>
 
-                        <button type="submit" className="btn glossy-btn w-100 fw-bold rounded-3 py-2">
-                            <i className="fa-solid fa-paper-plane me-2"></i> Send Reset Link
+                        {error && (
+                            <div className="alert alert-danger py-2 mb-3" role="alert">
+                                {error}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            className="btn glossy-btn w-100 fw-bold rounded-3 py-2"
+                            disabled={isLoading}
+                        >
+                            <i className="fa-solid fa-paper-plane me-2"></i>
+                            {isLoading ? 'Sending...' : 'Send Reset Link'}
                         </button>
                     </form>
 
