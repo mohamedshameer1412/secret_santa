@@ -39,54 +39,52 @@ const sendTokenResponse = (user, statusCode, res) => {
 // Register a new user
 exports.register = async (req, res) => {
   try {
+    console.log("Registration request received:", req.body); // Debug log
     const { name, email, password } = req.body;
+
+    // Add input validation
+    if (!name || !email || !password) {
+      console.log("Missing required fields:", { name: !!name, email: !!email, password: !!password });
+      return res.status(400).json({ message: 'Please provide name, email, and password' });
+    }
+
+    console.log('Registration attempt:', { name, email }); // Debug log
 
     // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
+      console.log("User already exists:", email);
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Create verification token
-    const verificationToken = crypto.randomBytes(20).toString('hex');
-    const verificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create new user
     user = new User({
       name,
       email,
-      password,
-      verificationToken,
-      verificationExpires
+      password: hashedPassword,
+      isVerified: true
     });
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
+    console.log('User object created, attempting to save...'); // Debug log
 
-    user.isVerified = true;
     await user.save();
+    console.log('User saved successfully'); // Debug log
 
-    // Send verification email
-    try {
-  const verificationURL = `${req.protocol}://${req.get('host')}/api/auth/verify/${verificationToken}`;
-  const message = `
-    <h1>Email Verification</h1>
-    <p>Please click the link below to verify your email address:</p>
-    <a href="${verificationURL}" target="_blank">Verify Email</a>
-  `;
-
-  await sendEmail(user.email, 'Please verify your email address', message);
-} catch (emailError) {
-  console.error("Email sending failed:", emailError);
-}
-
-res.status(201).json({ 
-  message: 'User registered successfully. You can now log in.' 
-});
+    res.status(201).json({ 
+      message: 'User registered successfully. You can now log in.' 
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Registration error:', err); // More detailed error logging
+    console.error('Error message:', err.message);
+    if (err.code === 11000) {
+      console.error('Duplicate key error:', err.keyValue);
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+    res.status(500).json({ message: 'Server error: ' + err.message });
   }
 };
 

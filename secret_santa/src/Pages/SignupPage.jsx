@@ -24,12 +24,14 @@ const SignupPage = () => {
         setIsLoading(true);
         try {
             console.log("Submitting registration with:", { fullName, email }); // Log what we're sending
-            await authService.register(fullName, email, password);
-            alert('Account created!');
+            const result = await authService.register(fullName, email, password);
+            console.log("Registration successful:", result);
+            alert('Registration successful! You can now log in.');
             navigate('/login');
         } catch (err) {
-            console.error("Full error object:", err);  // Log the full error
-            alert(`Error: ${err.message || 'Registration failed'}`);
+            console.error("Registration failed:", err); // More detailed error logging
+            console.error("Error object:", JSON.stringify(err, null, 2));
+            alert(`Registration failed: ${err.message || 'Unknown error'}`);
         } finally {
             setIsLoading(false);
         }
