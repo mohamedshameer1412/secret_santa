@@ -46,20 +46,70 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        loading, 
-        error,
-        isAuthenticated: !!user, 
-        login, 
-        logout 
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+// Add these new functions
+const forgotPassword = async (email) => {
+  try {
+    setError(null);
+    const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to send reset email');
+    }
+    
+    return data;
+  } catch (err) {
+    setError(err.message);
+    throw err;
+  }
 };
 
+const resetPassword = async (token, password) => {
+  try {
+    setError(null);
+    const response = await fetch(`http://localhost:5000/api/auth/reset-password/${token}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to reset password');
+    }
+    
+    return data;
+  } catch (err) {
+    setError(err.message);
+    throw err;
+  }
+};
+
+return (
+  <AuthContext.Provider 
+    value={{ 
+      user, 
+      loading, 
+      error,
+      isAuthenticated: !!user, 
+      login, 
+      logout,
+      forgotPassword,
+      resetPassword
+    }}
+  >
+    {children}
+  </AuthContext.Provider>
+);
+};
 export default AuthContext;
