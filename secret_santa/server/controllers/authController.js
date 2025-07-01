@@ -202,7 +202,7 @@ exports.forgotPassword = async (req, res) => {
     await user.save(); 
 
     // Create reset URL
-    const resetURL = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
+    const resetURL = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
     const message = `
       <h1>Password Reset</h1>
       <p>You requested a password reset. Please click the link below to reset your password:</p>
