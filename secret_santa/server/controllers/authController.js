@@ -199,7 +199,7 @@ exports.forgotPassword = async (req, res) => {
     // Set token and expiry on user document
     user.resetPasswordToken = resetToken;
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
-    await user.save();
+    await user.save(); 
 
     // Create reset URL
     const resetURL = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
