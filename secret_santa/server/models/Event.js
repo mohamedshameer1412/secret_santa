@@ -1,9 +1,41 @@
 const mongoose = require('mongoose');
 
-const EventSchema = new mongoose.Schema({
+// Embedded Participant Schema
+const ParticipantSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true
+  },
+  email: {
+    type: String,
+    required: true
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  wishlist: {
+    type: String,
+    default: ''
+  },
+  confirmed: {
+    type: Boolean,
+    default: false
+  },
+  giftFor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // or 'Participant' if needed
+    default: null
+  }
+}, { _id: true }); // Keep _id for referencing participants
+
+// Event Schema
+const EventSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
   },
   description: {
     type: String,
@@ -14,33 +46,7 @@ const EventSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  participants: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    },
-    confirmed: {
-      type: Boolean,
-      default: false
-    },
-    giftFor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Participant',
-      default: null
-    },
-    wishlist: {
-      type: String,
-      default: ''
-    }
-  }],
+  participants: [ParticipantSchema],
   budget: {
     min: {
       type: Number,
