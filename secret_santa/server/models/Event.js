@@ -15,10 +15,13 @@ const ParticipantSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
-  wishlist: {
-    type: String,
-    default: ''
-  },
+  wishlist: [
+    {
+      name: { type: String, required: true }, // e.g. "Bluetooth Headphones"
+      url: { type: String },                  // e.g. Amazon/product link
+      notes: { type: String }                 // e.g. "Preferably black color"
+    }
+  ],
   confirmed: {
     type: Boolean,
     default: false
