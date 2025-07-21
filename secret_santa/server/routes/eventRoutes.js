@@ -63,40 +63,6 @@ router.get(
   eventController.getEvent
 );
 
-router.post(
-  '/:eventId/participants/:participantId/wishlist',
-  protect,
-  [
-    param('eventId').isMongoId().withMessage('Invalid event ID'),
-    param('participantId').isMongoId().withMessage('Invalid participant ID'),
-    body('name').notEmpty().withMessage('Wishlist item name is required'),
-    body('url').optional().isURL().withMessage('Invalid URL'),
-    body('notes').optional().isString()
-  ],
-  validate,
-  async (req, res) => {
-    try {
-      const Event = require('../models/Event');
-      const event = await Event.findById(req.params.eventId);
-      if (!event) return res.status(404).json({ message: 'Event not found' });
-
-      const participant = event.participants.id(req.params.participantId);
-      if (!participant) return res.status(404).json({ message: 'Participant not found' });
-
-      participant.wishlist.push({
-        name: req.body.name,
-        url: req.body.url,
-        notes: req.body.notes
-      });
-
-      await event.save();
-      res.status(201).json({ wishlist: participant.wishlist });
-    } catch (err) {
-      res.status(500).json({ message: 'Server error' });
-    }
-  }
-);
-
 // Get wishlist for a participant
 router.get(
   '/:eventId/participants/:participantId/wishlist',
@@ -114,6 +80,16 @@ router.get(
 
       const participant = event.participants.id(req.params.participantId);
       if (!participant) return res.status(404).json({ message: 'Participant not found' });
+
+      // Authorization: Only the participant themselves or their ChrisMom can view
+      const isParticipantThemselves = participant.user && participant.user.equals(req.user.id);
+      const isChrisMom = event.participants.some(
+        p => p.giftFor && p.giftFor.equals(participant._id) && p.user && p.user.equals(req.user.id)
+      );
+
+      if (!isParticipantThemselves && !isChrisMom) {
+        return res.status(403).json({ message: 'Not authorized to view this wishlist' });
+      }
 
       res.json({ wishlist: participant.wishlist });
     } catch (err) {
@@ -152,6 +128,46 @@ router.put(
 
       await event.save();
       res.json({ wishlist: participant.wishlist });
+    } catch (err) {
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+
+// Add wishlist item
+router.post(
+  '/:eventId/participants/:participantId/wishlist',
+  protect,
+  [
+    param('eventId').isMongoId().withMessage('Invalid event ID'),
+    param('participantId').isMongoId().withMessage('Invalid participant ID'),
+    body('name').notEmpty().withMessage('Wishlist item name is required'),
+    body('url').optional().isURL().withMessage('Invalid URL'),
+    body('notes').optional().isString()
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const Event = require('../models/Event');
+      const event = await Event.findById(req.params.eventId);
+      if (!event) return res.status(404).json({ message: 'Event not found' });
+
+      const participant = event.participants.id(req.params.participantId);
+      if (!participant) return res.status(404).json({ message: 'Participant not found' });
+
+      // Authorization: Only the participant can add to their own wishlist
+      if (!participant.user || !participant.user.equals(req.user.id)) {
+        return res.status(403).json({ message: 'Not authorized to modify this wishlist' });
+      }
+
+      participant.wishlist.push({
+        name: req.body.name,
+        url: req.body.url,
+        notes: req.body.notes
+      });
+
+      await event.save();
+      res.status(201).json({ wishlist: participant.wishlist });
     } catch (err) {
       res.status(500).json({ message: 'Server error' });
     }

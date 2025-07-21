@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Message = require('../models/Message');
+const ChatRoom = require('../models/ChatRoom');
 
 // Send a message to a chat room (encrypts before saving)
 router.post('/:roomId/message', async (req, res) => {
