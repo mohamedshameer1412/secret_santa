@@ -52,7 +52,7 @@ const forgotPassword = async (email) => {
     setError(null);
     const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
       method: 'POST',
-      headers: {
+      ers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ email }),
@@ -76,7 +76,7 @@ const resetPassword = async (token, password) => {
     setError(null);
     const response = await fetch(`http://localhost:5000/api/auth/reset-password/${token}`, {
       method: 'POST',
-      headers: {
+      ers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ password }),

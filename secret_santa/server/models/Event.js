@@ -17,7 +17,7 @@ const ParticipantSchema = new mongoose.Schema({
   },
   wishlist: [
     {
-      name: { type: String, required: true }, // e.g. "Bluetooth Headphones"
+      name: { type: String, required: true }, // e.g. "Bluetooth phones"
       url: { type: String },                  // e.g. Amazon/product link
       notes: { type: String }                 // e.g. "Preferably black color"
     }
