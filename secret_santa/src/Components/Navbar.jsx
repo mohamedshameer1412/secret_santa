@@ -76,7 +76,7 @@ const Navbar = ({ toggleSidebar, username = 'John Doe', profilePic = '/assets/sa
                         </li>
                         <li>
                             <a className="dropdown-item" href="#settings">
-                                <i className="fas fa-cog me-2"></i> Settings
+                                <i className="fas fa-cog me-2"></i> Room Settings
                             </a>
                         </li>
 

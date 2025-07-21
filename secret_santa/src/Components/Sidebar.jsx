@@ -4,17 +4,14 @@ import React from 'react';
 const Sidebar = ({ isOpen }) => {
   const menuItems = [
     { icon: 'fa-solid fa-house', label: 'Dashboard' },
-    { icon: 'fa-solid fa-door-open', label: 'Create/Join Room' },
+    // { icon: 'fa-solid fa-door-open', label: 'Create/Join Room' },
     { icon: 'fa-solid fa-comments', label: 'Group Chat' },
-    { icon: 'fa-solid fa-user-secret', label: 'Anonymous Group Chat' },
-    { icon: 'fa-solid fa-user', label: 'Individual Chat' },
-    { icon: 'fa-solid fa-mask', label: 'Anonymous Chat' },
-    { icon: 'fa-solid fa-hand-fist', label: 'Dare Assignments' },
-    { icon: 'fa-solid fa-lightbulb', label: 'Clues to Find Parent' },
-    { icon: 'fa-solid fa-heart', label: 'Child Wishlist' },
-    { icon: 'fa-solid fa-gifts', label: 'Gifts & Notes' },
-    { icon: 'fa-solid fa-upload', label: 'Submit Proof' },
-    { icon: 'fa-solid fa-user-circle', label: 'Profile & Media' },
+    // { icon: 'fa-solid fa-hand-fist', label: 'Dare Assignments' },
+    // { icon: 'fa-solid fa-heart', label: 'Child Wishlist' },
+    // { icon: 'fa-solid fa-gifts', label: 'Gifts & Notes' },
+    // { icon: 'fa-solid fa-upload', label: 'Submit Proof' },
+    // { icon: 'fa-solid fa-user-circle', label: 'Profile & Media' },
+    { icon: 'fa-solid fa-users', label: 'Village People' },
     { icon: 'fa-solid fa-right-from-bracket', label: 'Logout' },
   ];
 
