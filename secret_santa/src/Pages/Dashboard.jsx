@@ -30,12 +30,12 @@ const Dashboard = () => {
       {/* Main Content Wrapper */}
       <main className={`content ${sidebarOpen ? '' : 'shifted'} py-5 my-5 px-4`} data-aos="fade-up">
         <div className="container-fluid mt-4">
-          <header className="mb-4">
+          <er className="mb-4">
             <h2 className="text-danger fw-bold">
               <i className="fa-solid fa-gamepad me-2"></i>Game Dashboard
             </h2>
             <p className="text-muted mb-0">Your central hub to manage dares, rooms, chat, and submissions.</p>
-          </header>
+          </er>
 
           {/* Room Creation / Entry */}
           {!currentRoom ? (

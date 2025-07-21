@@ -16,7 +16,7 @@ const DareModal = ({ show, setShow }) => {
       <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content p-3">
-            <div className="modal-header">
+            <div className="modal-er">
               <h5 className="modal-title text-danger">🎁 Your Dare</h5>
               <button className="btn-close" onClick={() => setShow(false)}></button>
             </div>

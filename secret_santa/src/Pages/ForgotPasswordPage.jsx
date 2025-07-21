@@ -1,15 +1,29 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/useAuth';
 import './LoginPage.css';
 
 const ForgotPasswordPage = () => {
-    const navigate = useNavigate();
     const [email, setEmail] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState(false);
+    const { forgotPassword } = useAuth();
 
-    const handleForgotPassword = (e) => {
+    const handleForgotPassword = async (e) => {
         e.preventDefault();
-        alert('Password reset link sent to your email!');
-        navigate('/reset-password');
+        setError('');
+        setSuccess(false);
+        setIsLoading(true);
+        
+        try {
+            await forgotPassword(email);
+            setSuccess(true);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to send reset email');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -31,31 +45,62 @@ const ForgotPasswordPage = () => {
                     <h2 className="fw-bold mb-4 text-danger">
                         <img src="/assets/logo.png" width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
                         <span className="d-block d-md-none"><br /></span>
-                        Secret Santa                         <span className="d-block mt-3"></span>
+                        Secret Santa <span className="d-block mt-3"></span>
                         Forgot Password
                     </h2>
                     <p className="text-muted mb-4">Enter your email to receive a reset link</p>
 
-                    <form onSubmit={handleForgotPassword}>
-                        <div className="mb-4">
-                            <label htmlFor="email" className="form-label text-success">
-                                <i className="fa-solid fa-envelope me-2"></i> Email address
-                            </label>
-                            <input
-                                type="email"
-                                className="form-control border border-success rounded-3"
-                                id="email"
-                                placeholder="santa@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
+                    {success ? (
+                        <div className="alert alert-success" role="alert">
+                            <i className="fa-solid fa-check-circle me-2"></i>
+                            Reset link sent! Please check your email inbox.
+                            <p className="mt-2 mb-0 small">
+                                If you don't see it, please check your spam folder.
+                            </p>
                         </div>
+                    ) : (
+                        <form onSubmit={handleForgotPassword}>
+                            <div className="mb-4">
+                                <label htmlFor="email" className="form-label text-success">
+                                    <i className="fa-solid fa-envelope me-2"></i> Email address
+                                </label>
+                                <input
+                                    type="email"
+                                    className="form-control border border-success rounded-3"
+                                    id="email"
+                                    placeholder="santa@example.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                />
+                            </div>
 
-                        <button type="submit" className="btn glossy-btn w-100 fw-bold rounded-3 py-2">
-                            <i className="fa-solid fa-paper-plane me-2"></i> Send Reset Link
-                        </button>
-                    </form>
+                            {error && (
+                                <div className="alert alert-danger py-2 mb-3" role="alert">
+                                    <i className="fa-solid fa-triangle-exclamation me-2"></i>
+                                    {error}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                className="btn glossy-btn w-100 fw-bold rounded-3 py-2"
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin me-2"></i>
+                                        Sending...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fa-solid fa-paper-plane me-2"></i>
+                                        Send Reset Link
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                    )}
 
                     <p className="mt-4 text-muted small">
                         Remembered your password? <Link to="/login" className="custom-link">Login</Link>

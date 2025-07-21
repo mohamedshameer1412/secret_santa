@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import authService from '../services/authService';
 import './LoginPage.css';
 
 const SignupPage = () => {
@@ -9,14 +11,30 @@ const SignupPage = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
 
-    const handleSignup = (e) => {
+    const handleSignup = async (e) => {
         e.preventDefault();
         if (password !== confirmPassword) {
             alert('Passwords do not match!');
             return;
         }
-        alert('Signup Successful!');
+
+        setIsLoading(true);
+        try {
+            console.log("Submitting registration with:", { fullName, email }); // Log what we're sending
+            const result = await authService.register(fullName, email, password);
+            console.log("Registration successful:", result);
+            alert('Registration successful! You can now log in.');
+            navigate('/login');
+        } catch (err) {
+            console.error("Registration failed:", err); // More detailed error logging
+            console.error("Error object:", JSON.stringify(err, null, 2));
+            alert(`Registration failed: ${err.message || 'Unknown error'}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -143,13 +161,18 @@ const SignupPage = () => {
                             </div>
                         </div>
 
-                        <button type="submit" className="btn glossy-btn w-100 fw-bold rounded-3 py-2">
-                            <i className="fa-solid fa-gift me-2"></i>Sign Up
+                        <button
+                            type="submit"
+                            className="btn glossy-btn w-100 fw-bold rounded-3 py-2"
+                            disabled={isLoading}
+                        >
+                            <i className="fa-solid fa-gift me-2"></i>
+                            {isLoading ? 'Signing Up...' : 'Sign Up'}
                         </button>
                     </form>
 
                     <p className="mt-4 text-muted small">
-                        Already have an account? <a href="/login" className="custom-link">Login</a>
+                        Already have an account? <Link to="/login" className="custom-link">Login</Link>
                     </p>
                 </div>
             </div>

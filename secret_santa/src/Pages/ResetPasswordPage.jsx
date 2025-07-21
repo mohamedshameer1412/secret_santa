@@ -1,19 +1,50 @@
 import React, { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../context/useAuth';
 import './LoginPage.css';
+
+import santa3 from '../assets/santa3.png';
+import logo from '../assets/logo.png';
+import santaShow from '../assets/santa-show.png';
+import santaHide from '../assets/santa-hide.png';
 
 const ResetPasswordPage = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { token } = useParams();
+    const navigate = useNavigate();
+    const { resetPassword } = useAuth();
 
-    const handleResetPassword = (e) => {
+    const handleResetPassword = async (e) => {
         e.preventDefault();
+        setError('');
+        setIsLoading(true); // Add this line - it was missing!
+        
         if (newPassword !== confirmPassword) {
-            alert('Passwords do not match!');
+            setError('Passwords do not match!');
+            setIsLoading(false); // Add this line too
             return;
         }
-        alert('Password successfully reset!');
+
+        try {
+            await resetPassword(token, newPassword);
+            setError(''); 
+            
+            const successElement = document.createElement('div');
+            successElement.className = 'alert alert-success';
+            successElement.textContent = 'Password reset successful! Redirecting to login...';
+            document.querySelector('form').prepend(successElement);
+            
+            setTimeout(() => navigate('/login'), 3000);
+        } catch (err) {
+            setError(err.message || 'Failed to reset password'); // Remove .response?.data?.message
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -23,7 +54,11 @@ const ResetPasswordPage = () => {
                 {/* Image Side */}
                 <div className="col-md-5 p-0 h-100  image-container">
                     <img
+ 
                         src="/assets/santa3.png"
+
+                        src={santa3}
+ 
                         alt="Santa Claus"
                         className="img-fluid h-100 w-100 rounded-4 m-3 border border-white border-5 shadow-lg"
                         style={{ objectFit: 'cover' }}
@@ -33,7 +68,11 @@ const ResetPasswordPage = () => {
                 {/* Form Side */}
                 <div className="col-md-6 p-5 text-start glass-effect animate-slide m-4 border border-white border-5 shadow-lg">
                     <h2 className="fw-bold mb-4 text-danger">
+ 
                         <img src="/assets/logo.png" width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
+
+                        <img src={logo} width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
+ 
                         <span className="d-block d-md-none"><br /></span>
                         Secret Santa                         <span className="d-block mt-3"></span>                        
                         Reset Password
@@ -42,6 +81,11 @@ const ResetPasswordPage = () => {
                     <p className="text-muted mb-4">Enter your new password</p>
 
                     <form onSubmit={handleResetPassword}>
+                        {error && (
+                            <div className="alert alert-danger" role="alert">
+                                {error}
+                            </div>
+                        )}
                         <div className="mb-3 position-relative">
                             <label htmlFor="newPassword" className="form-label text-success">
                                 <i className="fa-solid fa-lock me-2"></i> New Password
@@ -56,7 +100,11 @@ const ResetPasswordPage = () => {
                                 required
                             />
                             <img
+ 
                                 src={showNewPassword ? '/assets/santa-show.png' : '/assets/santa-hide.png'}
+
+                                src={showNewPassword ? santaShow : santaHide}
+ 
                                 alt="Toggle Password"
                                 className="password-toggle"
                                 onClick={() => setShowNewPassword(!showNewPassword)}
@@ -78,7 +126,11 @@ const ResetPasswordPage = () => {
                                 required
                             />
                             <img
+ 
                                 src={showConfirmPassword ? '/assets/santa-show.png' : '/assets/santa-hide.png'}
+
+                                src={showConfirmPassword ? santaShow : santaHide}
+ 
                                 alt="Toggle Password"
                                 className="password-toggle"
                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -86,13 +138,18 @@ const ResetPasswordPage = () => {
                             />
                         </div>
 
-                        <button type="submit" className="btn glossy-btn w-100 fw-bold rounded-3 py-2">
-                            <i className="fa-solid fa-key me-2"></i>Reset Password
+                        <button
+                            type="submit"
+                            className="btn glossy-btn w-100 fw-bold rounded-3 py-2"
+                            disabled={isLoading}
+                        >
+                            <i className="fa-solid fa-key me-2"></i>
+                            {isLoading ? 'Resetting...' : 'Reset Password'}
                         </button>
                     </form>
 
                     <p className="mt-4 text-muted small">
-                        Go back to <a href="/login" className="custom-link">Login</a>
+                        Go back to <Link to="/login" className="custom-link">Login</Link>
                     </p>
                 </div>
             </div>
