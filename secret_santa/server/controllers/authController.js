@@ -5,28 +5,18 @@ const crypto = require('crypto');
 const { sendEmail } = require('../utils/sendEmail');
 
 const sendTokenResponse = (user, statusCode, res) => {
-  // Create token
-  const token = jwt.sign(
-    { user: { id: user._id, role: user.role } },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE || '7d' }
-  );
+  const payload = { id: user._id, role: user.role };
+  
+  try {
+    const token = jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-  // Cookie options
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    expires: new Date(
-      Date.now() + (parseInt(process.env.JWT_COOKIE_EXPIRE) || 7) * 24 * 60 * 60 * 1000
-    )
-  };
-
-  res
-    .status(statusCode)
-    .cookie('token', token, cookieOptions)
-    .json({
+    res.status(statusCode).json({
       success: true,
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -34,6 +24,9 @@ const sendTokenResponse = (user, statusCode, res) => {
         role: user.role
       }
     });
+  } catch (err) {
+    res.status(500).json({ message: 'Token creation failed' });
+  }
 };
 
 // Register a new user
@@ -116,34 +109,24 @@ exports.verifyEmail = async (req, res) => {
 };
 
 // Login user
-// Login user
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
-    // Debug logging
-    console.log('Login attempt:', email);
 
-    // Use case-insensitive email search
     const user = await User.findOne({ 
       email: { $regex: new RegExp(`^${email}$`, 'i') } 
     });
     
-    // Debug logging
-    console.log('User found:', user ? 'Yes' : 'No');
     
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Check if email is verified
     if (!user.isVerified) {
       return res.status(401).json({ message: 'Please verify your email before logging in' });
     }
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log('Password match:', isMatch ? 'Yes' : 'No');
     
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
@@ -153,7 +136,6 @@ exports.login = async (req, res) => {
     sendTokenResponse(user, 200, res);
     
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 };

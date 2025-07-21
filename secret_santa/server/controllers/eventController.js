@@ -17,30 +17,52 @@ exports.createEvent = async (req, res) => {
       participants: participants.map(p => ({
         name: p.name,
         email: p.email,
-        user: p.userId || null
+        user: p.userId || null,
+        confirmed: true
       }))
     });
 
     const event = await newEvent.save();
 
-    // Send invitations to participants
+        // Send NOTIFICATION emails to participants (not verification)
     for (let participant of event.participants) {
-      const invitationLink = `${req.protocol}://${req.get('host')}/event/join/${event._id}`;
       const message = `
-        <h1>You've been invited to a Secret Santa!</h1>
-        <p>${req.user.name} has invited you to join their Secret Santa event: ${name}</p>
-        <p><strong>Event Details:</strong><br>
-        ${description}<br>
-        Budget: ${budget.min}-${budget.max} ${budget.currency}<br>
-        Exchange Date: ${new Date(exchangeDate).toLocaleDateString()}</p>
-        <p>Click the link below to join and provide your wishlist:</p>
-        <a href="${invitationLink}" target="_blank">Join Secret Santa</a>
+        <h1>🎄 You've been added to a Secret Santa event!</h1>
+        <p><strong>${req.user.name}</strong> has added you to their Secret Santa event: <strong>${name}</strong></p>
+        
+        <h2>📋 Event Details:</h2>
+        <ul>
+          <li><strong>Event:</strong> ${name}</li>
+          <li><strong>Description:</strong> ${description || 'No description provided'}</li>
+          <li><strong>Budget:</strong> $${budget || '0-50'}</li>
+          <li><strong>Exchange Date:</strong> ${new Date(exchangeDate).toLocaleDateString()}</li>
+        </ul>
+        
+        <p>🎁 You're all set! No action required from you.</p>
+        <p>The organizer will let you know when it's time for the gift exchange.</p>
+        
+        <hr>
+        <p><small>This is an automated notification. You don't need to click any links or verify anything.</small></p>
       `;
 
-      await sendEmail(participant.email, `Secret Santa Invitation: ${name}`, message);
+      try {
+        await sendEmail(
+          participant.email, 
+          `🎄 You've been added to: ${name}`, 
+          message
+        );
+      } catch (emailError) {
+        console.error(`❌ Failed to send notification to ${participant.email}:`, emailError.message);
+        // Continue without failing the entire request
+      }
     }
 
-    res.status(201).json(event);
+    res.status(201).json({
+      success: true,
+      data: event,
+      message: `Event created and ${event.participants.length} participants notified`
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
