@@ -14,13 +14,40 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({
-  origin: [
-    process.env.CLIENT_URL || 'http://localhost:5173',
-    'http://127.0.0.1:5173'
-  ],
-  credentials: true
-}));
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173',          // Vite dev server  
+      'http://127.0.0.1:5173',         // Alternative localhost
+      'https://hoppscotch.io',         // For API testing
+      process.env.CLIENT_URL,          // production frontend URL
+    ];
+
+    if (process.env.NODE_ENV === 'development') {
+      allowedOrigins.push('http://localhost:3001', 'http://localhost:8080');
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`🚫 CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200 // For legacy browser support
+};
+
+app.use(cors(corsOptions));
+
+app.get('/api/health', (req, res) => {
+  res.json({ message: 'Server is running!', timestamp: new Date() });
+});
 
 // Database connection with improved error handling
 const connectDB = async () => {
