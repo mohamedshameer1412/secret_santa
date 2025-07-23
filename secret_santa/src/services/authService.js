@@ -6,7 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 // Create axios instance with base config
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
+  ers: {
     'Content-Type': 'application/json'
   },
   withCredentials: true

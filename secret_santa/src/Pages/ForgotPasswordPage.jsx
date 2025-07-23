@@ -33,7 +33,7 @@ const ForgotPasswordPage = () => {
                 {/* Image Side */}
                 <div className="col-md-5 p-0 h-100 image-container">
                     <img
-                        src="src/assets/santa1.png"
+                        src="/assets/santa1.png"
                         alt="Santa Claus"
                         className="img-fluid h-100 w-100 rounded-4 m-3 border border-white border-5 shadow-lg"
                         style={{ objectFit: 'cover' }}
@@ -43,7 +43,7 @@ const ForgotPasswordPage = () => {
                 {/* Form Side */}
                 <div className="col-md-6 p-5 text-start glass-effect animate-slide m-4 border border-white border-5 shadow-lg">
                     <h2 className="fw-bold mb-4 text-danger">
-                        <img src="src/assets/logo.png" width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
+                        <img src="/assets/logo.png" width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
                         <span className="d-block d-md-none"><br /></span>
                         Secret Santa <span className="d-block mt-3"></span>
                         Forgot Password

@@ -1,20 +1,10 @@
 const express = require('express');
-const { body, param, validationResult } = require('express-validator');
 const router = express.Router();
-
-const {
-  register,
-  login,
-  verifyEmail,
-  forgotPassword,
-  resetPassword,
-  logout,
-  getCurrentUser
-} = require('../controllers/authController');
-
+const { body, param, validationResult } = require('express-validator');
+const authController = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
-// 📌 Middleware to handle validation results
+// Validation middleware - extract to be reusable
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -23,7 +13,7 @@ const validate = (req, res, next) => {
   next();
 };
 
-// ✅ Register route with validations
+// Registration validation
 router.post(
   '/register',
   [
@@ -34,10 +24,10 @@ router.post(
       .withMessage('Password must be at least 6 characters long')
   ],
   validate,
-  register
+  authController.register
 );
 
-// ✅ Login route with validations
+// Login validation
 router.post(
   '/login',
   [
@@ -45,26 +35,28 @@ router.post(
     body('password').exists().withMessage('Password is required')
   ],
   validate,
-  login
+  authController.login
 );
 
-// ✅ Email verification
+// Email verification with token validation
 router.get(
   '/verify/:token',
-  [param('token').isLength({ min: 40, max: 40 }).withMessage('Invalid verification token')],
+  [
+    param('token').isLength({ min: 40, max: 40 }).withMessage('Invalid verification token')
+  ],
   validate,
-  verifyEmail
+  authController.verifyEmail
 );
 
-// ✅ Forgot password
+// Forgot password
 router.post(
   '/forgot-password',
   [body('email').isEmail().withMessage('Please include a valid email')],
   validate,
-  forgotPassword
+  authController.forgotPassword
 );
 
-// ✅ Reset password
+// Reset password with token validation
 router.post(
   '/reset-password/:token',
   [
@@ -74,13 +66,13 @@ router.post(
       .withMessage('Password must be at least 6 characters long')
   ],
   validate,
-  resetPassword
+  authController.resetPassword
 );
 
-// ✅ Logout route (protected)
-router.get('/logout', protect, logout);
+// Protected routes
+router.get('/logout', protect, authController.logout);
 
-// ✅ Get logged-in user profile (protected)
-router.get('/me', protect, getCurrentUser);
+// Get current user profile (new route)
+router.get('/me', protect, authController.getCurrentUser);
 
 module.exports = router;

@@ -8,9 +8,9 @@ exports.protect = async (req, res, next) => {
   if (req.cookies.token) {
     token = req.cookies.token;
   }
-  // Then check headers (for API clients)
-  else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
+  // Then check ers (for API clients)
+  else if (req.ers.authorization && req.ers.authorization.startsWith('Bearer')) {
+    token = req.ers.authorization.split(' ')[1];
   }
 
  // Make sure token exists
