@@ -2,15 +2,21 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 exports.protect = async (req, res, next) => {
+
+  const authHeader = req.headers && req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Not authorized, no token' });
+  }
+  
   let token;
   
   // Check for token in cookies first (for browser clients)
   if (req.cookies.token) {
     token = req.cookies.token;
   }
-  // Then check ers (for API clients)
-  else if (req.ers.authorization && req.ers.authorization.startsWith('Bearer')) {
-    token = req.ers.authorization.split(' ')[1];
+  // Then check headers (for API clients)
+  else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
   }
 
  // Make sure token exists
