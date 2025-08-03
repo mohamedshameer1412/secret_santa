@@ -1,86 +1,118 @@
-import React, { useState } from 'react';
-import Navbar from '../Components/Navbar';
-import Sidebar from '../Components/Sidebar';
-import DareModal from '../Components/DareModal';
-import ProfileCard from '../Components/ProfileCard';
-import RoomManager from '../Components/RoomManager';
-import ChatBoard from '../Components/ChatBoard';
-import SubmissionBoard from '../Components/SubmissionBoard';
+import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
+import Confetti from "react-confetti";
+import Lottie from "lottie-react";
+import spinAnimation from "../assets/spin.json"; // Lottie JSON for spinning wheel
+import Navbar from "../Components/Navbar";
+import Sidebar from "../Components/Sidebar";
+import { FaGift, FaQuestionCircle, FaList, FaUser, FaComments } from "react-icons/fa";
 
-const Dashboard = () => {
+const wishlists = ["Teddy Bear", "Toy Car", "Story Book", "Video Game", "Crayon Set", "Candy Box"];
+const dares = ["Sing a Christmas song", "Do a fun dance", "Give a gift", "Tell your silliest joke"];
+const clues = ["Wears a red hat", "Loves animals", "Sparkles with joy", "Has creative hands"];
+
+const ChildGenerator = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [currentRoom, setCurrentRoom] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [child, setChild] = useState(null);
 
-  const [players] = useState([
-    { name: 'Player 1', img: '/public/assets/santa1.png' },
-    { name: 'Player 2', img: '/public/assets/santa2.png' },
-    { name: 'Player 3', img: '/public/assets/santa3.png' },
-    { name: 'Player 4', img: '/public/assets/santa4.png' },
-  ]);
+  const generateChild = () => {
+    setLoading(true);
+    setChild(null);
+    setShowConfetti(false);
+
+    setTimeout(() => {
+      // Randomized child object
+      const newChild = { /* same as user code */ };
+
+      setChild(newChild);
+      setLoading(false);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 2000);
+    }, 2000);
+  };
 
   return (
-    <>
-      {/* Top Navbar */}
+    <div className="d-flex flex-column w-100 vh-100">
       <Navbar toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-
-      {/* Sidebar Navigation */}
       <Sidebar isOpen={sidebarOpen} />
 
-      {/* Main Content Wrapper */}
-      <main className={`content ${sidebarOpen ? '' : 'shifted'} py-5 my-5 px-4`} data-aos="fade-up">
-        <div className="container-fluid mt-4">
-          <er className="mb-4">
-            <h2 className="text-danger fw-bold">
-              <i className="fa-solid fa-gamepad me-2"></i>Game Dashboard
-            </h2>
-            <p className="text-muted mb-0">Your central hub to manage dares, rooms, chat, and submissions.</p>
-          </er>
+      <main className={`content ${sidebarOpen ? '' : 'shifted'} p-4`}>
+        {showConfetti && <Confetti width={window.innerWidth} height={window.innerHeight} />}
+        <div className="bg-white bg-opacity-75 p-4 rounded-4 shadow-lg text-center">
+          <h2 className="text-danger fw-bold"><FaGift className="me-2" />Secret Santa Lottery</h2>
 
-          {/* Room Creation / Entry */}
-          {!currentRoom ? (
-            <section className="my-5">
-              <RoomManager setRoom={setCurrentRoom} />
-            </section>
-          ) : (
-            <>
-              {/* Dare Button & Room Status */}
-              <section className="d-flex justify-content-between align-items-center my-4">
-                <button className="btn btn-success px-4 py-2 shadow-sm" onClick={() => setShowModal(true)}>
-                  <i className="fa-solid fa-bolt me-2"></i>Get a Dare
-                </button>
-                <span className="text-muted">
-                  <i className="fa-solid fa-door-open me-1"></i>
-                  Room: <strong>{currentRoom}</strong>
-                </span>
-              </section>
+          <motion.button
+            className="btn btn-success mt-3 px-5 py-2"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={generateChild}
+            disabled={loading}
+          >
+            {loading ? <FaGift className="me-1" /> : <FaGift className="me-1" />} Spin the Wheel
+          </motion.button>
 
-              {/* Player Cards */}
-              <section className="row mb-4">
-                {players.map((player, index) => (
-                    <ProfileCard name={player.name} img={player.img} />
-                ))}
-              </section>
+          {/* Lottery Spin Animation */}
+          <AnimatePresence>
+            {loading && (
+              <motion.div
+                key="loader"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="mt-4 d-flex flex-column align-items-center"
+              >
+                <Lottie animationData={spinAnimation} style={{ width: 150, height: 150 }} />
+                <p className="mt-3 text-muted">Drawing your child...</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              {/* Chat Section */}
-              <section className="mb-5">
-                <ChatBoard room={currentRoom} />
-              </section>
+          {/* Child Profile Reveal */}
+          <AnimatePresence>
+            {child && (
+              <motion.div
+                key={child.id}
+                initial={{ scale: 0.8, opacity: 0, y: 50 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 100 }}
+                className="mt-5 bg-white rounded-4 shadow-sm p-4 mx-auto"
+                style={{ maxWidth: 600 }}
+              >
+                <div className="text-center mb-3">
+                  <img
+                    src={child.avatar}
+                    alt={child.name}
+                    className="rounded-circle border shadow-sm"
+                    width={120}
+                    height={120}
+                  />
+                  <h4 className="mt-2 fw-bold"><FaUser className="me-2" />{child.name}, Age {child.age}</h4>
+                </div>
 
-              {/* Proof Submission */}
-              <section className="mb-5">
-                
-                <SubmissionBoard />
-              </section>
-            </>
-          )}
+                <ul className="list-group list-group-flush fs-6">
+                  <li className="list-group-item"><FaList className="me-2 text-primary" />Wishlist: <strong>{child.wishlist}</strong></li>
+                  <li className="list-group-item"><FaGift className="me-2 text-success" />Dare: <strong>{child.dare}</strong></li>
+                  <li className="list-group-item"><FaQuestionCircle className="me-2 text-warning" />Clue: <em>{child.clue}</em></li>
+                </ul>
+
+                <div className="text-center mt-4">
+                  <motion.button
+                    className="btn btn-outline-primary"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <FaComments className="me-2" />Start Chat
+                  </motion.button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </main>
-
-      {/* Dare Modal */}
-      <DareModal show={showModal} setShow={setShowModal} />
-    </>
+    </div>
   );
 };
 
-export default Dashboard;
+export default ChildGenerator;

@@ -1,23 +1,20 @@
-// components/Sidebar.jsx
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const Sidebar = ({ isOpen }) => {
+  const location = useLocation();
+
   const menuItems = [
-    { icon: 'fa-solid fa-house', label: 'Dashboard' },
-    // { icon: 'fa-solid fa-door-open', label: 'Create/Join Room' },
-    { icon: 'fa-solid fa-comments', label: 'Group Chat' },
-    // { icon: 'fa-solid fa-hand-fist', label: 'Dare Assignments' },
-    // { icon: 'fa-solid fa-heart', label: 'Child Wishlist' },
-    // { icon: 'fa-solid fa-gifts', label: 'Gifts & Notes' },
-    // { icon: 'fa-solid fa-upload', label: 'Submit Proof' },
-    // { icon: 'fa-solid fa-user-circle', label: 'Profile & Media' },
-    { icon: 'fa-solid fa-users', label: 'Village People' },
-    { icon: 'fa-solid fa-right-from-bracket', label: 'Logout' },
+    { icon: 'fa-solid fa-house', label: 'Dashboard', path: '/dashboard' },
+    { icon: 'fa-solid fa-comments', label: 'Group Chat', path: '/chat' },
+    { icon: 'fa-solid fa-users', label: 'Village People', path: '/contact' },
+    { icon: 'fa-solid fa-gift', label: 'Wish List', path: '/wishlist' },
+    { icon: 'fa-solid fa-right-from-bracket', label: 'Logout', path: '/logout' },
   ];
 
   return (
     <div className={`sidebar ${isOpen ? 'visible' : 'hide'}`}>
-      {/* Logo and Title */}
+      {/* Logo */}
       <div
         className="d-flex align-items-center mb-4 mx-4 my-5"
         style={{ userSelect: 'none' }}
@@ -38,8 +35,14 @@ const Sidebar = ({ isOpen }) => {
       {/* Navigation Items */}
       <ul className="sidebar-menu px-3">
         {menuItems.map((item, index) => (
-          <li key={index} className="mb-3" style={{ cursor: 'pointer' }}>
-            <i className={`${item.icon} me-2`}></i> {item.label}
+          <li key={index} className="mb-3">
+            <Link
+              to={item.path}
+              className={`text-decoration-none d-flex align-items-center ${location.pathname === item.path ? 'active' : ''}`}
+            >
+              <i className={`${item.icon} me-2`}></i>
+              {item.label}
+            </Link>
           </li>
         ))}
       </ul>
