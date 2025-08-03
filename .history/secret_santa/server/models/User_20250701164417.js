@@ -7,12 +7,6 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Name is required'],
     trim: true
   },
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true
-  },
   email: {
     type: String,
     required: [true, 'Email is required'],
@@ -46,15 +40,10 @@ const userSchema = new mongoose.Schema({
   },
   resetPasswordExpires: {
     type: Date
-  },
-  chatHistory: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
-  }]
+  }
 }, { timestamps: true });
 
-
-// 🔐 Hash password before saving
+// 🔐 Pre-save hook to hash password if modified
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(10);
@@ -62,17 +51,9 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-// ✅ Compare input password with hashed one
+// ✅ Instance method to compare password
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// 💬 Add a message to chat history
-userSchema.methods.addToChatHistory = function(messageId) {
-  this.chatHistory.push(messageId);
-  return this.save();
-};
-
-const User = mongoose.model('User', userSchema);
-
-module.exports = User;
+module.exports = mongoose.model('User', userSchema);

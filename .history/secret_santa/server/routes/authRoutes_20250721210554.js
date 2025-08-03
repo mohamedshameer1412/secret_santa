@@ -3,8 +3,8 @@ const { body, param, validationResult } = require('express-validator');
 const router = express.Router();
 
 const {
-  register,
-  login,
+  registerUser,
+  loginUser,
   verifyEmail,
   forgotPassword,
   resetPassword,
@@ -34,7 +34,7 @@ router.post(
       .withMessage('Password must be at least 6 characters long')
   ],
   validate,
-  register
+  registerUser
 );
 
 // ✅ Login route with validations
@@ -45,7 +45,7 @@ router.post(
     body('password').exists().withMessage('Password is required')
   ],
   validate,
-  login
+  loginUser
 );
 
 // ✅ Email verification

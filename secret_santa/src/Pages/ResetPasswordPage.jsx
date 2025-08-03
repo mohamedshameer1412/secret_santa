@@ -3,10 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import './LoginPage.css';
 
-// import santa3 from '../assets/santa3.png';
-// import logo from '../assets/logo.png';
-// import santaShow from '../assets/santa-show.png';
-// import santaHide from '../assets/santa-hide.png';
+import santa3 from '../assets/santa3.png';
+import logo from '../assets/logo.png';
+import santaShow from '../assets/santa-show.png';
+import santaHide from '../assets/santa-hide.png';
 
 const ResetPasswordPage = () => {
     const [newPassword, setNewPassword] = useState('');
@@ -56,8 +56,6 @@ const ResetPasswordPage = () => {
                     <img
  
                         src="/assets/santa3.png"
-
-                        // src={santa3}
  
                         alt="Santa Claus"
                         className="img-fluid h-100 w-100 rounded-4 m-3 border border-white border-5 shadow-lg"
@@ -71,7 +69,7 @@ const ResetPasswordPage = () => {
  
                         <img src="/assets/logo.png" width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
 
-                        {/* <img src={logo} width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" /> */}
+                        <img src={logo} width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
  
                         <span className="d-block d-md-none"><br /></span>
                         Secret Santa                         <span className="d-block mt-3"></span>                        
@@ -103,7 +101,6 @@ const ResetPasswordPage = () => {
  
                                 src={showNewPassword ? '/assets/santa-show.png' : '/assets/santa-hide.png'}
 
-                                // src={showNewPassword ? santaShow : santaHide}
  
                                 alt="Toggle Password"
                                 className="password-toggle"
@@ -129,7 +126,6 @@ const ResetPasswordPage = () => {
  
                                 src={showConfirmPassword ? '/assets/santa-show.png' : '/assets/santa-hide.png'}
 
-                                // src={showConfirmPassword ? santaShow : santaHide}
  
                                 alt="Toggle Password"
                                 className="password-toggle"

@@ -7,7 +7,6 @@ import SignupPage from './Pages/SignUpPage'
 import GroupChat from './Pages/GroupChat'
 import Dashboard from './Pages/Dashboard'
 import VillagePeople from './Pages/VillagePeople'
-import MyWishlist from './Pages/MyWishlist'
 
 function App() {
   // const { isAuthenticated } = useAuth(); 
@@ -22,7 +21,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/chat" element={<GroupChat />} />
         <Route path="/contact" element={<VillagePeople />} />
-        <Route path="/wishlist" element={<MyWishlist />} />
+        <Route path="/wish" element={<MyWishlist />} />
         
         {/* Redirect root to login page */}
         <Route path="/" element={<Navigate replace to="/login" />} />

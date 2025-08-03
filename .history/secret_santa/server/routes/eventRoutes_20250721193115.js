@@ -19,12 +19,23 @@ router.post(
   protect,
   [
     body('name').trim().not().isEmpty().withMessage('Event name is required'),
-    body('exchangeDate').isDate().withMessage('Valid event date is required'),
+    body('date').isDate().withMessage('Valid event date is required'),
     body('budget').optional().isFloat({ min: 0 }).withMessage('Budget must be a positive number'),
     body('participants').optional().isArray().withMessage('Participants must be an array')
   ],
   validate,
   eventController.createEvent
+);
+
+// Join event validation
+router.post(
+  '/join/:eventId',
+  protect,
+  [
+    param('eventId').isMongoId().withMessage('Invalid event ID')
+  ],
+  validate,
+  eventController.joinEvent
 );
 
 // Update event validation
