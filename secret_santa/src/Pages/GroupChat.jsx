@@ -6,7 +6,7 @@ import 'animate.css';
 import axios from 'axios';
 
 const GroupChat = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([
         {

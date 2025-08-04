@@ -3,10 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import './LoginPage.css';
 
-import santa3 from '../assets/santa3.png';
-import logo from '../assets/logo.png';
-import santaShow from '../assets/santa-show.png';
-import santaHide from '../assets/santa-hide.png';
+// import santa3 from '../assets/santa3.png';
+// import logo from '../assets/logo.png';
 
 const ResetPasswordPage = () => {
     const [newPassword, setNewPassword] = useState('');

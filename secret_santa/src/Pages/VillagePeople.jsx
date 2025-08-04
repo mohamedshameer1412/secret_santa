@@ -11,7 +11,7 @@ const mockUsers = [
 
 const VillagePeople = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const filteredUsers = mockUsers.filter(user =>
     user.name.toLowerCase().includes(searchQuery.toLowerCase())

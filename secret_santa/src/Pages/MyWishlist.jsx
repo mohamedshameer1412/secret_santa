@@ -18,11 +18,11 @@ const MyWishlist = () => {
             description: "Warm and soft socks for winter.",
             link: "",
             image: "https://i.pravatar.cc/400?img=69",
-            important: true
+            important: false
         },
     ]);
 
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [newItem, setNewItem] = useState({ title: "", description: "", link: "", image: "", important: false });
     const [editItemId, setEditItemId] = useState(null);
     const modalRef = useRef();
@@ -99,7 +99,7 @@ const MyWishlist = () => {
                             <i className="fas fa-gift text-danger me-2"></i> My Wishlist
                         </h3>
                         <p className="text-muted mb-4">
-                            Mark the most important gifts with ⭐ so your Secret Santa knows what matters most!
+                            Mark the most important gifts with   <i className="fas fa-star text-warning"></i> so your Secret Santa knows what matters most!
                         </p>
 
                         {/* ✅ Wishlist Items */}

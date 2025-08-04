@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secret Child Reveal</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .slot-machine {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      background: #111;
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+      position: relative;
+    }
+
+    .slot {
+      width: 80px;
+      height: 120px;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      text-align: center;
+      font-size: 2rem;
+      color: #333;
+      font-weight: bold;
+      position: relative;
+    }
+
+    .reel {
+      position: absolute;
+      top: 0;
+      width: 100%;
+      animation: spin 2s ease-in-out forwards;
+    }
+
+    .symbol {
+      height: 120px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    @keyframes spin {
+      0% { top: 0; }
+      100% { top: -240px; }
+    }
+
+    .modal-content {
+      background: #1f1f1f;
+      color: #fff;
+      border-radius: 15px;
+    }
+
+    .modal-header {
+      border-bottom: none;
+    }
+
+    .modal-footer {
+      border-top: none;
+    }
+
+    .confetti {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .confetti i {
+      position: absolute;
+      animation: fall 3s linear infinite;
+    }
+
+    @keyframes fall {
+      0% { transform: translateY(-10px); opacity: 1; }
+      100% { transform: translateY(100vh); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="slot-machine">
+    <div class="slot">
+      <div class="reel">
+        <div class="symbol"><i class="fas fa-star"></i></div>
+        <div class="symbol"><i class="fas fa-gift"></i></div>
+        <div class="symbol"><i class="fas fa-user"></i></div>
+      </div>
+    </div>
+    <div class="slot">
+      <div class="reel">
+        <div class="symbol"><i class="fas fa-candy-cane"></i></div>
+        <div class="symbol"><i class="fas fa-sleigh"></i></div>
+        <div class="symbol"><i class="fas fa-user"></i></div>
+      </div>
+    </div>
+    <div class="slot">
+      <div class="reel">
+        <div class="symbol"><i class="fas fa-tree"></i></div>
+        <div class="symbol"><i class="fas fa-bell"></i></div>
+        <div class="symbol"><i class="fas fa-user"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confetti -->
+  <div class="confetti" id="confetti"></div>
+
+  <!-- Modal -->
+  <div class="modal fade" id="revealModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content text-center">
+        <div class="modal-header border-0">
+          <h1 class="modal-title w-100"><i class="fas fa-gift text-warning me-2"></i> 🎉 Surprise! 🎉</h1>
+        </div>
+        <div class="modal-body">
+          <h3>Your secret child is:</h3>
+          <h2 class="text-info mt-3 fw-bold" id="childName">✨ John Doe ✨</h2>
+        </div>
+        <div class="modal-footer justify-content-center">
+          <a href="/child-profile.html" class="btn btn-success px-4">Go to Profile</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = () => {
+      const confettiContainer = document.getElementById("confetti");
+
+      // Trigger confetti
+      for (let i = 0; i < 30; i++) {
+        const icon = document.createElement("i");
+        icon.className = "fas fa-star text-warning";
+        icon.style.left = Math.random() * 100 + "vw";
+        icon.style.animationDelay = Math.random() * 3 + "s";
+        confettiContainer.appendChild(icon);
+      }
+
+      // Reveal after 2.5s
+      setTimeout(() => {
+        const modal = new bootstrap.Modal(document.getElementById("revealModal"));
+        modal.show();
+      }, 2500);
+    };
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
