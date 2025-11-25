@@ -1,9 +1,10 @@
-import './App.css'
+import './App.css';
 import {  Routes, Route, Navigate } from 'react-router-dom';
-import ForgotPasswordPage from './Pages/ForgotPasswordPage'
-import LoginPage from './Pages/LoginPage'
-import ResetPasswordPage from './Pages/ResetPasswordPage'
-import SignupPage from './Pages/SignUpPage'
+import ForgotPasswordPage from './Pages/ForgotPasswordPage';
+import LoginPage from './Pages/LoginPage';
+import ResetPasswordPage from './Pages/ResetPasswordPage';
+import SignupPage from './Pages/SignUpPage';
+import GroupChat from './Pages/GroupChat';
 
 function App() {
   return (
@@ -13,6 +14,9 @@ function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+        {/* Group chat route (expects roomId param) */}
+        <Route path="/chat/:roomId" element={<GroupChat />} />
         
         {/* Redirect root to login page */}
         <Route path="/" element={<Navigate replace to="/login" />} />

@@ -4,6 +4,13 @@ const Message = require('../models/Message');
 const ChatRoom = require('../models/ChatRoom');
 const { protect } = require('../middleware/auth');
 
+// Add the anonymous name pool
+const anonymousNamePool = [
+  'Batman', 'Kingster', 'Shadow', 'Phoenix', 'Mystic', 'Ranger',
+  'Thunder', 'Storm', 'Ninja', 'Ghost', 'Falcon', 'Wolf', 'Viper',
+  'Eagle', 'Tiger', 'Dragon', 'Phantom', 'Raven', 'Hawk', 'Cobra'
+];
+
 function generateAnonymousName(room, userId) {
   // Initialize anonymousNames Map if it doesn't exist
   if (!room.anonymousNames) {
@@ -31,14 +38,74 @@ function generateAnonymousName(room, userId) {
   return newName;
 }
 
-// Add this to chatRoutes.js for quick testing
-router.post('/create-room', async (req, res) => {
+// Create room (protected)
+router.post('/create-room', protect, async (req, res) => {
   try {
     const { name } = req.body;
-    const room = await ChatRoom.create({ name: name || 'Test Room' });
+    const room = await ChatRoom.createRoom(name || 'Test Room', req.user.id);
     res.json({ success: true, room });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all rooms for current user
+router.get('/my-rooms', protect, async (req, res) => {
+  try {
+    const rooms = await ChatRoom.find({
+      participants: req.user.id
+    })
+    .populate('organizer', 'name email username')
+    .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      rooms: rooms.map(room => ({
+        _id: room._id,
+        name: room.name,
+        anonymousMode: room.anonymousMode,
+        organizer: room.organizer,
+        participantCount: room.participants.length,
+        messageCount: room.messages.length,
+        createdAt: room.createdAt
+      }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error fetching rooms' });
+  }
+});
+
+// Get specific room by ID
+router.get('/:roomId', protect, async (req, res) => {
+  try {
+    const room = await ChatRoom.findById(req.params.roomId)
+      .populate('participants', 'name email username')
+      .populate('organizer', 'name email username');
+
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const isParticipant = room.participants.some(p => p._id.toString() === req.user.id);
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'You are not a participant in this room' });
+    }
+
+    res.json({
+      success: true,
+      room: {
+        _id: room._id,
+        name: room.name,
+        anonymousMode: room.anonymousMode,
+        organizer: room.organizer,
+        participants: room.participants,
+        createdAt: room.createdAt
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error fetching room' });
   }
 });
 

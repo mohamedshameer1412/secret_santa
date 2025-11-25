@@ -26,6 +26,11 @@ const roomSchema = new mongoose.Schema({
     type: Boolean,
     default: false
     },
+  anonymousNames: {
+    type: Map,
+    of: String,
+    default: new Map()
+    },
     organizer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -34,10 +39,11 @@ const roomSchema = new mongoose.Schema({
 });
 
 // Static: Create a new room
-roomSchema.statics.createRoom = async function (name) {
+roomSchema.statics.createRoom = async function (name, organizerId) {
   const room = new this({
     name,
-    organizer: organizerId
+    organizer: organizerId,
+    participants: [organizerId]
   });
   return await room.save();
 };
