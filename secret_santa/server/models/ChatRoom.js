@@ -21,12 +21,24 @@ const roomSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  anonymousMode: {
+    type: Boolean,
+    default: false
+    },
+    organizer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+    }
 });
 
 // Static: Create a new room
 roomSchema.statics.createRoom = async function (name) {
-  const room = new this({ name });
+  const room = new this({
+    name,
+    organizer: organizerId
+  });
   return await room.save();
 };
 
