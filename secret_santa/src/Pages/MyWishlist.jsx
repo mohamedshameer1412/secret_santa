@@ -1,35 +1,68 @@
 import React, { useState, useEffect } from "react";
 import Navbar from '../Components/Navbar';
 import Sidebar from '../Components/Sidebar';
+import axios from 'axios';
+import { useAuth } from '../context/useAuth';
+import { useNavigate } from 'react-router-dom';
+
+const API_URL = 'http://localhost:5000/api/wishlist';
 
 const MyWishlist = () => {
-    const [wishlist, setWishlist] = useState([
-        {
-            id: 1,
-            title: "A Good Book",
-            description: "Any motivational or fiction novel.",
-            link: "https://www.goodreads.com/",
-            image: "https://covers.openlibrary.org/b/id/10594762-L.jpg",
-            important: false
-        },
-        {
-            id: 2,
-            title: "Cozy Socks",
-            description: "Warm and soft socks for winter.",
-            link: "",
-            image: "https://i.pravatar.cc/400?img=69",
-            important: false
-        },
-    ]);
-
+    const { user, loading: authLoading } = useAuth();
+    const navigate = useNavigate();
+    const [wishlist, setWishlist] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [newItem, setNewItem] = useState({ title: "", description: "", link: "", image: "", important: false });
     const [editItemId, setEditItemId] = useState(null);
     const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
+        const fetchWishlist = async () => {
+            if (authLoading) return;
+            
+            // Redirect if no user
+            if (!user) {
+                navigate('/login');
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    navigate('/login');
+                    return;
+                }
+
+                const res = await axios.get(API_URL, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                setWishlist(res.data.items);
+            } catch (error) {
+                console.error('Error fetching wishlist:', error);
+                
+                if (error.response?.status === 401 || error.response?.status === 403) {
+                    localStorage.removeItem('token');
+                    navigate('/login');
+                    return;
+                }
+                
+                // For other errors, show alert but don't redirect
+                if (error.response?.status !== 404) {
+                    alert('Failed to load wishlist');
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchWishlist();
+    }, [authLoading, user, navigate]);
+
+    useEffect(() => {
         if (editItemId !== null) {
-            const item = wishlist.find((item) => item.id === editItemId);
+            const item = wishlist.find((item) => item._id === editItemId);
             if (item) setNewItem(item);
         } else {
             setNewItem({ title: "", description: "", link: "", image: "", important: false });
@@ -54,34 +87,89 @@ const MyWishlist = () => {
         setNewItem({ title: "", description: "", link: "", image: "", important: false });
     };
 
-    const handleAddOrUpdate = () => {
+    const handleAddOrUpdate = async () => {
         if (!newItem.title.trim()) return alert("Please enter a title.");
-        if (editItemId) {
-            setWishlist((prev) =>
-                prev.map((item) => (item.id === editItemId ? { ...item, ...newItem } : item))
-            );
-        } else {
-            setWishlist((prev) => [...prev, { id: Date.now(), ...newItem }]);
+        
+        try {
+            const token = localStorage.getItem('token');
+            
+            if (editItemId) {
+                const res = await axios.put(
+                    `${API_URL}/${editItemId}`,
+                    newItem,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                setWishlist((prev) =>
+                    prev.map((item) => (item._id === editItemId ? res.data.item : item))
+                );
+            } else {
+                const res = await axios.post(
+                    API_URL,
+                    newItem,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                setWishlist((prev) => [...prev, res.data.item]);
+            }
+            
+            closeModal();
+        } catch (error) {
+            console.error('Error saving item:', error);
+            alert('Failed to save item. Please try again.');
         }
-        closeModal();
     };
 
     const handleEdit = (item) => {
-        setEditItemId(item.id);
+        setEditItemId(item._id);
         openModal();
     };
 
-    const handleDelete = (id) => {
-        setWishlist((prev) => prev.filter((item) => item.id !== id));
+    const handleDelete = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this item?')) return;
+        
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`${API_URL}/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            setWishlist((prev) => prev.filter((item) => item._id !== id));
+        } catch (error) {
+            console.error('Error deleting item:', error);
+            alert('Failed to delete item. Please try again.');
+        }
     };
 
-    const toggleImportant = (id) => {
-        setWishlist((prev) =>
-            prev
-                .map((item) => (item.id === id ? { ...item, important: !item.important } : item))
-                .sort((a, b) => b.important - a.important)
-        );
+    const toggleImportant = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            const item = wishlist.find(i => i._id === id);
+            
+            const res = await axios.put(
+                `${API_URL}/${id}`,
+                { ...item, important: !item.important },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            
+            setWishlist((prev) =>
+                prev
+                    .map((item) => (item._id === id ? res.data.item : item))
+                    .sort((a, b) => b.important - a.important)
+            );
+        } catch (error) {
+            console.error('Error toggling importance:', error);
+            alert('Failed to update item. Please try again.');
+        }
     };
+
+    if (authLoading || loading) {
+        return (
+            <div className="d-flex justify-content-center align-items-center vh-100">
+                <div className="spinner-border text-danger" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="d-flex flex-column w-100 vh-100">
@@ -105,80 +193,83 @@ const MyWishlist = () => {
                                 Mark the most important gifts with <i className="fas fa-star text-warning"></i> so your Secret Santa knows what matters most!
                             </p>
 
-                            {/* Wishlist Items */}
-                            <ul className="list-group mb-4">
-                                {wishlist.map((item) => (
-                                    <li key={item.id}
-                                        className="list-group-item border-0 mb-3 rounded shadow-sm p-3 d-flex flex-column flex-sm-row align-items-center gap-3"
-                                        style={{
-                                            background: item.important
-                                                ? "rgba(255, 250, 200, 0.85)"
-                                                : "rgba(255,255,255,0.85)",
-                                            backdropFilter: "blur(10px)",
-                                            transition: "all 0.3s ease"
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 6px 18px rgba(0,0,0,0.15)"}
-                                        onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"}
-                                    >
-                                        {/* Image Section */}
-                                        <div className="text-center" style={{ flexShrink: 0 }}>
-                                            <img
-                                                src={item.image || "https://via.placeholder.com/120"}
-                                                alt={item.title}
-                                                className="rounded shadow-sm"
-                                                style={{ width: "120px", height: "120px", objectFit: "cover" }}
-                                            />
-                                        </div>
+                            {wishlist.length === 0 ? (
+                                <div className="text-center py-5">
+                                    <i className="fas fa-gift text-muted" style={{ fontSize: '4rem' }}></i>
+                                    <h4 className="text-muted mt-3">Your wishlist is empty</h4>
+                                    <p className="text-muted">Add items to help your Secret Santa find the perfect gift!</p>
+                                </div>
+                            ) : (
+                                <ul className="list-group mb-4">
+                                    {wishlist.map((item) => (
+                                        <li key={item._id}
+                                            className="list-group-item border-0 mb-3 rounded shadow-sm p-3 d-flex flex-column flex-sm-row align-items-center gap-3"
+                                            style={{
+                                                background: item.important
+                                                    ? "rgba(255, 250, 200, 0.85)"
+                                                    : "rgba(255,255,255,0.85)",
+                                                backdropFilter: "blur(10px)",
+                                                transition: "all 0.3s ease"
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 6px 18px rgba(0,0,0,0.15)"}
+                                            onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"}
+                                        >
+                                            <div className="text-center" style={{ flexShrink: 0 }}>
+                                                <img
+                                                    src={item.image || "https://via.placeholder.com/120"}
+                                                    alt={item.title}
+                                                    className="rounded shadow-sm"
+                                                    style={{ width: "120px", height: "120px", objectFit: "cover" }}
+                                                />
+                                            </div>
 
-                                        {/* Info Section */}
-                                        <div className="flex-grow-1 text-center text-sm-start">
-                                            <h6 className="fw-semibold mb-1">
-                                                {item.title}{" "}
-                                                {item.important && (
-                                                    <i className="fas fa-star text-warning"></i>
+                                            <div className="flex-grow-1 text-center text-sm-start">
+                                                <h6 className="fw-semibold mb-1">
+                                                    {item.title}{" "}
+                                                    {item.important && (
+                                                        <i className="fas fa-star text-warning"></i>
+                                                    )}
+                                                </h6>
+                                                <p className="text-muted mb-1" style={{ fontSize: "14px" }}>
+                                                    {item.description}
+                                                </p>
+                                                {item.link && (
+                                                    <a href={item.link} target="_blank" rel="noopener noreferrer"
+                                                        className="text-decoration-none text-primary"
+                                                        style={{ fontSize: "13px" }}>
+                                                        <i className="fas fa-link me-1"></i> {new URL(item.link).hostname}
+                                                    </a>
                                                 )}
-                                            </h6>
-                                            <p className="text-muted mb-1" style={{ fontSize: "14px" }}>
-                                                {item.description}
-                                            </p>
-                                            {item.link && (
-                                                <a href={item.link} target="_blank" rel="noopener noreferrer"
-                                                    className="text-decoration-none text-primary"
-                                                    style={{ fontSize: "13px" }}>
-                                                    <i className="fas fa-link me-1"></i> {new URL(item.link).hostname}
-                                                </a>
-                                            )}
-                                        </div>
+                                            </div>
 
-                                        {/* Buttons Section */}
-                                        <div className="d-flex flex-sm-column flex-row gap-2 justify-content-center align-items-center">
-                                            <button
-                                                className={`btn btn-sm ${item.important ? "btn-warning" : "btn-outline-warning"}`}
-                                                title="Mark as Important"
-                                                onClick={() => toggleImportant(item.id)}
-                                            >
-                                                <i className="fas fa-star"></i>
-                                            </button>
+                                            <div className="d-flex flex-sm-column flex-row gap-2 justify-content-center align-items-center">
+                                                <button
+                                                    className={`btn btn-sm ${item.important ? "btn-warning" : "btn-outline-warning"}`}
+                                                    title="Mark as Important"
+                                                    onClick={() => toggleImportant(item._id)}
+                                                >
+                                                    <i className="fas fa-star"></i>
+                                                </button>
 
-                                            <button
-                                                className="btn btn-sm btn-outline-primary"
-                                                onClick={() => handleEdit(item)}
-                                            >
-                                                <i className="fas fa-edit"></i>
-                                            </button>
+                                                <button
+                                                    className="btn btn-sm btn-outline-primary"
+                                                    onClick={() => handleEdit(item)}
+                                                >
+                                                    <i className="fas fa-edit"></i>
+                                                </button>
 
-                                            <button
-                                                className="btn btn-sm btn-outline-danger"
-                                                onClick={() => handleDelete(item.id)}
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
+                                                <button
+                                                    className="btn btn-sm btn-outline-danger"
+                                                    onClick={() => handleDelete(item._id)}
+                                                >
+                                                    <i className="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
 
-                            {/* Add New Item */}
                             <button className="btn btn-danger w-100"
                                 style={{
                                     borderRadius: "10px",
@@ -192,17 +283,14 @@ const MyWishlist = () => {
                             </button>
                         </div>
 
-                        {/* Modal - React-controlled instead of Bootstrap JS */}
                         {showModal && (
                             <>
-                                {/* Backdrop */}
                                 <div 
                                     className="modal-backdrop fade show" 
                                     onClick={closeModal}
                                     style={{ zIndex: 1040 }}
                                 ></div>
                                 
-                                {/* Modal */}
                                 <div 
                                     className="modal fade show d-block" 
                                     tabIndex="-1" 

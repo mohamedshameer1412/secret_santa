@@ -78,6 +78,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
+app.use('/api/wishlist', require('./routes/wishlistRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
