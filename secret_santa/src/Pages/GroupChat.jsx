@@ -1,65 +1,188 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Sidebar from '../Components/Sidebar';
 import Picker from 'emoji-picker-react';
 import 'animate.css';
 import axios from 'axios';
+import { useAuth } from '../context/useAuth';
+import confetti from 'canvas-confetti';
+
+const API_URL = 'http://localhost:5000/api/chat';
 
 const GroupChat = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const { roomId } = useParams();
+    const { user, loading: authLoading } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    
+    const [sidebarOpen, setSidebarOpen] = useState(true);
     const [message, setMessage] = useState('');
-    const [messages, setMessages] = useState([
-        {
-            from: 'Anna',
-            content: 'Hey team! 🎁',
-            time: '10:30 AM',
-            img: '/assets/santa1.png',
-        },
-        {
-            from: 'You',
-            content: 'Hi! Ready for the dare? 🎯',
-            time: '10:32 AM',
-            img: '/assets/santa2.png',
-        },
-    ]);
+    const [rawMessages, setRawMessages] = useState([]);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [typingUsers, setTypingUsers] = useState([]);
     const [gifs, setGifs] = useState([]);
     const [showGifPicker, setShowGifPicker] = useState(false);
     const [gifQuery, setGifQuery] = useState('');
+    const [room, setRoom] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const chatEndRef = useRef(null);
     const inputRef = useRef(null);
+    const typingTimeoutRef = useRef(null);
 
-    const handleSend = () => {
-        if (message.trim()) {
-            const now = new Date();
-            const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            setMessages((prev) => [
-                ...prev,
-                {
-                    from: 'You',
-                    content: message,
-                    time,
-                    img: '/assets/santa2.png',
-                },
-            ]);
-            setMessage('');
-            setTypingUsers((prev) => prev.filter((name) => name !== 'You'));
+    const fetchRoomData = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+            const res = await axios.get(`${API_URL}/${roomId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setRoom(res.data.room);
+        } catch (error) {
+            console.error('Error fetching room data:', error);
+            if (error.response?.status === 401) {
+                navigate('/login');
+            }
         }
+    }, [roomId, navigate]);
+
+    const fetchMessages = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+            const res = await axios.get(`${API_URL}/${roomId}/messages`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            setRawMessages(res.data.messages);
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+            setLoading(false);
+            if (error.response?.status === 401) {
+                navigate('/login');
+            }
+        }
+    }, [roomId, navigate]);
+
+    const messages = useMemo(() => {
+        if (!user) return []; // Don't format if user not loaded yet
+        
+        return rawMessages.map(msg => {
+            const isCurrentUser = msg.senderId === user.id || msg.sender === user.username;
+            
+            return {
+                from: isCurrentUser ? (user.username || 'You') : msg.sender,
+                content: msg.text,
+                time: new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                img: isCurrentUser ? '/assets/santa2.png' : '/assets/santa1.png'
+            };
+        });
+    }, [rawMessages, user]);
+
+    // Confetti effect on login
+    useEffect(() => {
+        if (location.state?.showConfetti) {
+            confetti({
+                particleCount: 120,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#cc0000', '#00aa00', '#ffffff', '#ffd700']
+            });
+            // Remove the state so it doesn't repeat
+            window.history.replaceState({}, document.title);
+        }
+    }, [location]);
+    
+    // Fetch room details and messages on mount
+    useEffect(() => {
+        if (!roomId) {
+            navigate('/dashboard');
+            return;
+        }
+
+        if (!user) return;
+
+        fetchRoomData();
+        fetchMessages();
+    }, [roomId, navigate, fetchRoomData, fetchMessages, user]);
+
+    // Typing indicator logic
+    const setUserTyping = (isTyping) => {
+        if (isTyping) {
+            if (!typingUsers.includes('You')) {
+                setTypingUsers(prev => [...prev, 'You']);
+            }
+            // Clear existing timeout
+            clearTimeout(typingTimeoutRef.current);
+            // Set new timeout to remove typing indicator after 1.5s of inactivity
+            typingTimeoutRef.current = setTimeout(() => {
+                setTypingUsers(prev => prev.filter(n => n !== 'You'));
+            }, 1500);
+        } else {
+            clearTimeout(typingTimeoutRef.current);
+            setTypingUsers(prev => prev.filter(n => n !== 'You'));
+        }
+    };
+
+    const handleSend = async () => {
+        if (message.trim()) {
+            try {
+                const token = localStorage.getItem('token');
+                await axios.post(
+                    `${API_URL}/${roomId}/message`,
+                    { text: message },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                
+                setUserTyping(false);
+                
+                const now = new Date();
+                setRawMessages((prev) => [
+                    ...prev,
+                    {
+                        senderId: user?.id,
+                        sender: user?.username,
+                        text: message,
+                        sentAt: now.toISOString()
+                    },
+                ]);
+                
+                setMessage('');
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Failed to send message. Please try again.');
+            }
+        }
+    };
+
+    const handleInputChange = (e) => {
+        const newValue = e.target.value;
+
+        if (newValue !== message && (room?.participants?.length || 0) > 1) {
+            setUserTyping(true);
+        }
+        setMessage(newValue);
     };
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
-        } else {
-            if (!typingUsers.includes('You')) {
-                setTypingUsers([...typingUsers, 'You']);
-            }
         }
     };
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => clearTimeout(typingTimeoutRef.current);
+    }, []);
 
     const handleEmojiClick = (emojiObject) => {
         setMessage((prev) => prev + emojiObject.emoji);
@@ -67,7 +190,7 @@ const GroupChat = () => {
         inputRef.current.focus();
     };
 
-    const fetchGifs = async () => {
+    const fetchGifs = useCallback(async () => {
         try {
             const res = await axios.get(
                 `https://tenor.googleapis.com/v2/search?q=${gifQuery || 'funny'}&key=AIzaSyCoEto9P8kesHKJq7jpZq26eefogABlF1Q&limit=9&media_filter=mp4`
@@ -76,15 +199,35 @@ const GroupChat = () => {
         } catch (error) {
             console.error('Error fetching GIFs from Tenor:', error);
         }
-    };
+    }, [gifQuery]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    }, [rawMessages]);
 
     useEffect(() => {
         if (gifQuery) fetchGifs();
-    }, [gifQuery]);
+    }, [gifQuery, fetchGifs]);
+
+    // Poll for new messages every 3 seconds
+    useEffect(() => {
+        if (!user) return;
+
+        const interval = setInterval(() => {
+            if (roomId) fetchMessages();
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [roomId, fetchMessages, user]);
+
+    if (loading || authLoading) {
+        return (
+            <div className="d-flex justify-content-center align-items-center vh-100">
+                <div className="spinner-border text-danger" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="d-flex flex-column vh-100 w-100 ">
@@ -96,10 +239,23 @@ const GroupChat = () => {
                     style={{ marginTop: '56px' }}
                 >
                     <div className=" d-flex flex-column flex-grow-1 w-100 h-100 mt-3 pt-3 border border-danger-subtle border-4 shadow-sm">
+                        <div className="p-3 bg-white border-bottom border-danger-subtle">
+                            <h5 className="mb-0 text-danger">
+                                <i className="fa-solid fa-users me-2"></i>
+                                {room?.name || 'Group Chat'}
+                                {room?.participants?.length === 1 && (
+                                    <span className="badge bg-info ms-2">Personal</span>
+                                )}
+                                {room?.anonymousMode && (
+                                    <span className="badge bg-secondary ms-2">Anonymous Mode</span>
+                                )}
+                            </h5>
+                        </div>
+
                         <div className=" flex-grow-1 d-flex flex-column justify-content-between animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)' }}>
                             <div className="chat-scroll flex-grow-1 overflow-auto px-3 py-2" style={{ maxHeight: 'calc(100vh - 240px)' }}>
                                 {messages.map((msg, index) => {
-                                    const isUser = msg.from === 'You';
+                                    const isUser = msg.from === user?.username || msg.from === 'You';
                                     return (
                                         <div
                                             key={index}
@@ -145,7 +301,7 @@ const GroupChat = () => {
                                         <span className="fw-semibold text-danger">
                                             {typingUsers.join(', ')}
                                         </span>{' '}
-                                        {typingUsers.length === 1 ? 'is' : 'are'}{' '}
+                                        {typingUsers.includes('You') ? 'are' : (typingUsers.length === 1 ? 'is' : 'are')}{' '}
                                         <span className="typing-bounce">
                                             {'typing...'.split('').map((char, i) => (
                                                 <span
@@ -158,17 +314,14 @@ const GroupChat = () => {
                                             ))}
                                         </span>
                                         <span className="typing-dot me-1"></span>
-
                                     </div>
                                 )}
 
-
                                 <div ref={chatEndRef}></div>
                             </div>
+                            
                             <div className="d-flex align-items-end justify-content-between gap-3 p-3 bg-white shadow-sm flex-wrap border-top border-4 border-danger-subtle" style={{ position: 'sticky', bottom: 0, zIndex: 10 }}>
-                                {/* Emoji & GIF Buttons + Picker */}
                                 <div className="d-flex align-items-center gap-2 position-relative">
-                                    {/* Emoji Button */}
                                     <button
                                         className="btn btn-light rounded-circle d-flex align-items-center justify-content-center icon-btn"
                                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -177,7 +330,6 @@ const GroupChat = () => {
                                         <i className="fa-solid fa-face-smile fs-5 text-secondary"></i>
                                     </button>
 
-                                    {/* Emoji Picker */}
                                     {showEmojiPicker && (
                                         <div className="position-absolute bottom-100 start-0 mb-2 z-3">
                                             <Picker
@@ -189,7 +341,6 @@ const GroupChat = () => {
                                         </div>
                                     )}
 
-                                    {/* GIF Button */}
                                     <button
                                         className="btn btn-light rounded-circle d-flex align-items-center justify-content-center icon-btn"
                                         onClick={() => setShowGifPicker(!showGifPicker)}
@@ -198,7 +349,6 @@ const GroupChat = () => {
                                         <i className="fa-solid fa-image fs-5 text-secondary"></i>
                                     </button>
 
-                                    {/* GIF Picker */}
                                     {showGifPicker && (
                                         <div className="position-absolute bottom-100 start-0 mb-2 p-3 rounded shadow bg-white z-3" style={{ width: '300px', maxHeight: '320px', overflowY: 'auto' }}>
                                             <input
@@ -221,12 +371,13 @@ const GroupChat = () => {
                                                             playsInline
                                                             style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer' }}
                                                             onClick={() => {
-                                                                setMessages((prev) => [
+                                                                setRawMessages((prev) => [
                                                                     ...prev,
                                                                     {
-                                                                        from: 'You',
-                                                                        content: <video src={mp4Url} autoPlay loop muted playsInline style={{ width: '120px', borderRadius: '12px' }} />,
-                                                                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                                                        senderId: user?.id,
+                                                                        sender: user?.username,
+                                                                        text: <video src={mp4Url} autoPlay loop muted playsInline style={{ width: '120px', borderRadius: '12px' }} />,
+                                                                        sentAt: new Date().toISOString(),
                                                                         img: '/assets/santa2.png',
                                                                     },
                                                                 ]);
@@ -240,7 +391,6 @@ const GroupChat = () => {
                                     )}
                                 </div>
 
-                                {/* Message Input & Send Button */}
                                 <div className="d-flex flex-grow-1 align-items-end gap-2 ">
                                     <textarea
                                         ref={inputRef}
@@ -248,7 +398,7 @@ const GroupChat = () => {
                                         className="form-control flex-grow-1 px-3 py-2 rounded-4 shadow-sm"
                                         placeholder="Type a message..."
                                         value={message}
-                                        onChange={(e) => setMessage(e.target.value)}
+                                        onChange={handleInputChange}
                                         onKeyDown={handleKeyDown}
                                         style={{ minHeight: '44px', maxHeight: '120px', resize: 'none' }}
                                     ></textarea>
@@ -259,10 +409,8 @@ const GroupChat = () => {
                                     >
                                         <i className="fa-solid fa-paper-plane"></i>
                                     </button>
-
                                 </div>
                             </div>
-
                         </div>
                     </div>
                 </main>

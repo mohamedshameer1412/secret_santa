@@ -1,58 +1,55 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import confetti from 'canvas-confetti';
-import './LoginPage.css'; // Custom styles
+import axios from 'axios';
+import './LoginPage.css';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const confettiInterval = useRef(null);
     const { login } = useAuth();
     const navigate = useNavigate();
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Continuous Snowfall Animation
-    const launchConfettiLoop = () => {
-        if (confettiInterval.current) return;
-
-        confettiInterval.current = setInterval(() => {
-            confetti({
-                particleCount: 5,
-                spread: 360,
-                startVelocity: 20,
-                gravity: 0.5,
-                ticks: 200,
-                colors: ['#FFFFFF', '#DDE1E7', '#B3E5FC', '#81D4FA'],
-                zIndex: 9999,
-                origin: { x: Math.random(), y: Math.random() * 0.5 }
-            });
-        }, 200);
-    };
-
-    const stopConfetti = () => {
-        if (confettiInterval.current) {
-            clearInterval(confettiInterval.current);
-            confettiInterval.current = null;
-        }
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
-        
+
         try {
-            await login(email, password);
-            launchConfettiLoop();
-            // Redirect to dashboard after successful login
+            // Login and get response
+            const response = await login(email, password);
+            
+            // Get token from response or localStorage
+            const token = response?.token || localStorage.getItem('token');
+            
+            if (!token) {
+                throw new Error('Authentication failed - no token received');
+            }
+
+            // Try to fetch user's rooms
+            try {
+                const roomsRes = await axios.get('http://localhost:5000/api/chat/my-rooms', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                const firstRoomId = roomsRes.data?.rooms?.[0]?._id;
+                if (firstRoomId) {
+                    // Navigate to chat with confetti flag
+                    navigate(`/chat/${firstRoomId}`, { state: { showConfetti: true } });
+                    return;
+                }
+            } catch (err) {
+                console.warn('Could not fetch rooms:', err);
+            }
+
+            // Fallback - navigate to dashboard
             navigate('/dashboard');
         } catch (err) {
             setError(err.message || 'Failed to login');
-            stopConfetti();
         } finally {
             setIsLoading(false);
         }
@@ -60,24 +57,23 @@ const LoginPage = () => {
 
     return (
         <div className="login-page d-flex align-items-center justify-content-center p-2">
+            {/* ...rest of your JSX remains the same... */}
             <div className="row justify-content-center align-items-center shadow-lg rounded-4 p-0 p-md-2 overflow-hidden glossy glass-effect login-container">
-
-                {/* Image Side */}
                 <div className="col-md-5 p-0 h-100 image-container">
                     <img
                         src="/assets/santa-bg.png"
                         alt="Santa Claus"
-                        className="img-fluid h-100 w-100 rounded-4 m-3 border border-white border-5  shadow-lg"
+                        className="img-fluid h-100 w-100 rounded-4 m-3 border border-white border-5 shadow-lg"
                         style={{ objectFit: 'cover' }}
                     />
                 </div>
 
-                {/* Form Side */}
                 <div className="col-md-6 p-5 text-start glass-effect animate-slide m-4 border border-white border-5 shadow-lg">
                     <h2 className="fw-bold mb-4 text-danger">
                         <img src="/assets/logo.png" width={50} alt="Santa Icon" className="me-2 mt-md-0 mt-4" />
                         <span className="d-block d-md-none"><br /></span>
-                        Secret Santa                         <span className="d-block mt-3"></span> 
+                        Secret Santa
+                        <span className="d-block mt-3"></span>
                         Login
                     </h2>
                     <p className="text-muted mb-4">Join the holiday fun and surprise your friend with a gift!</p>

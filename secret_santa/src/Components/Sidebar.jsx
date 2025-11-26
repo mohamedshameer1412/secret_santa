@@ -1,9 +1,6 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
 
 const Sidebar = ({ isOpen }) => {
-  const location = useLocation();
-
   const menuItems = [
     { icon: 'fa-solid fa-house', label: 'Dashboard', path: '/dashboard' },
     { icon: 'fa-solid fa-comments', label: 'Group Chat', path: '/chat' },
@@ -11,6 +8,22 @@ const Sidebar = ({ isOpen }) => {
     { icon: 'fa-solid fa-gift', label: 'Wish List', path: '/wishlist' },
     { icon: 'fa-solid fa-right-from-bracket', label: 'Logout', path: '/logout' },
   ];
+
+    const handleMenuClick = async (item) => {
+        if (item.label === 'Logout') {
+            try {
+                await logout();
+            } catch (err) {
+                console.error('Logout failed:', err);
+            } finally {
+                navigate('/login');
+            }
+            return;
+        }
+
+        // navigate if item has a path (add path to menuItems for other entries)
+        if (item.path) navigate(item.path);
+    };
 
   return (
     <div className={`sidebar ${isOpen ? 'visible' : 'hide'}`}>
@@ -35,14 +48,8 @@ const Sidebar = ({ isOpen }) => {
       {/* Navigation Items */}
       <ul className="sidebar-menu px-3">
         {menuItems.map((item, index) => (
-          <li key={index} className="mb-3">
-            <Link
-              to={item.path}
-              className={`text-decoration-none d-flex align-items-center ${location.pathname === item.path ? 'active' : ''}`}
-            >
-              <i className={`${item.icon} me-2`}></i>
-              {item.label}
-            </Link>
+          <li key={index} className="mb-3" style={{ cursor: 'pointer' }}>
+            <i className={`${item.icon} me-2`}></i> {item.label}
           </li>
         ))}
       </ul>

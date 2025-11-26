@@ -11,14 +11,24 @@ export const AuthProvider = ({ children }) => {
   // Check if user is logged in on app load
   useEffect(() => {
     const checkUserLoggedIn = async () => {
-      try {
-        const response = await authService.getCurrentUser();
-        setUser(response.data);
-      } catch {
-        console.log('User not authenticated');
-      } finally {
-        setLoading(false);
-      }
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                // No token, skip the API call
+                setLoading(false);
+                return;
+            }
+            
+            const response = await authService.getCurrentUser();
+            setUser(response.data);
+        } catch (error) {
+            if (error.response?.status !== 401) {
+                console.error('Auth check error:', error);
+            }
+            localStorage.removeItem('token'); // Clear invalid token
+        } finally { 
+            setLoading(false);
+        }
     };
 
     checkUserLoggedIn();
