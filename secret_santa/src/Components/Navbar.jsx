@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/useAuth';
 
-const Navbar = ({ toggleSidebar, username = 'John Doe', profilePic = '/assets/santa-show.png' }) => {
+const Navbar = ({ toggleSidebar }) => {
+    const { user } = useAuth();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -51,9 +53,11 @@ const Navbar = ({ toggleSidebar, username = 'John Doe', profilePic = '/assets/sa
                     aria-label="User menu"
                     style={{ cursor: 'pointer' }}
                 >
-                    <span className="ms-2 text-white fw-semibold d-none d-md-inline">{username}</span>
+                    <span className="ms-2 text-white fw-semibold d-none d-md-inline">
+                        {user?.username || user?.name || 'User'}
+                    </span>
                     <img
-                        src={profilePic}
+                        src={user?.profilePic || '/assets/santa-show.png'}
                         alt="Profile"
                         width={40}
                         height={40}

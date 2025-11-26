@@ -3,6 +3,7 @@ const router = express.Router();
 const Message = require('../models/Message');
 const ChatRoom = require('../models/ChatRoom');
 const { protect } = require('../middleware/auth');
+const mongoose = require('mongoose');
 
 // Add the anonymous name pool
 const anonymousNamePool = [
@@ -109,78 +110,113 @@ router.get('/:roomId', protect, async (req, res) => {
   }
 });
 
-// Send a message to a chat room (encrypts before saving)
-router.post('/:roomId/message', async (req, res) => {
+// Get all messages from a chat room (decrypts before sending)
+router.get('/:roomId/messages', protect, async (req, res) => {
   try {
-    let { sender, text } = req.body;
-    if (!sender || !text) {
-      return res.status(400).json({ error: 'Sender and text are required' });
-    }
-
-    // Get room to check anonymous mode
     const room = await ChatRoom.findById(req.params.roomId);
     if (!room) return res.status(404).json({ error: 'Room not found' });
 
-    // If anonymous mode is on, use anonymous name
+    // Find messages and populate sender
+    const messages = await Message.find({ chatRoom: req.params.roomId })
+      .sort({ sentAt: 1 })
+      .lean();
+
+    const User = require('../models/User'); // Make sure User model is imported
+
+    const decryptedMessages = await Promise.all(messages.map(async msg => {
+      let displaySender = msg.sender;
+      let senderId = null;
+
+      // Check if sender is an ObjectId (user reference)
+      if (mongoose.Types.ObjectId.isValid(msg.sender)) {
+        senderId = msg.sender;
+        // Fetch the actual username from the database
+        const user = await User.findById(msg.sender);
+        displaySender = user ? user.username : msg.sender; // Fallback to ID if user not found
+      } else if (room.anonymousMode) {
+        // Already an anonymous name (string)
+        displaySender = msg.sender;
+      }
+
+      // Decrypt the message text
+      let decryptedText;
+      try {
+        decryptedText = Message.decryptText(msg.encryptedText, msg.iv);
+      } catch (err) {
+        console.error('Decryption error:', err);
+        decryptedText = '[Message could not be decrypted]';
+      }
+
+      return {
+        _id: msg._id,
+        sender: displaySender, // Now contains username instead of ID
+        senderId: senderId,     // Contains the user's ObjectId for comparison
+        text: decryptedText,
+        sentAt: msg.sentAt
+      };
+    }));
+
+    res.json({ 
+      success: true, 
+      messages: decryptedMessages, 
+      anonymousMode: room.anonymousMode 
+    });
+  } catch (err) {
+    console.error('Error in GET /:roomId/messages:', err);
+    res.status(500).json({ 
+      error: 'Error retrieving messages', 
+      details: err.message 
+    });
+  }
+});
+
+// Send a message to a chat room (encrypts before saving)
+router.post('/:roomId/message', protect, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+
+    // Use authenticated user ID (from JWT token)
+    const userId = req.user.id;
+
+    const room = await ChatRoom.findById(req.params.roomId);
+    if (!room) return res.status(404).json({ error: 'Room not found' });
+
+    // Check if user is a participant
+    const isParticipant = room.participants.some(p => p._id.toString() === userId);
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'You are not a participant in this room' });
+    }
+
+    // Determine sender name (anonymous or real)
+    let senderName = userId;
     if (room.anonymousMode) {
-      sender = generateAnonymousName(room, sender); // Use original sender as userId
-      await room.save(); // Save updated anonymous names mapping
+      senderName = generateAnonymousName(room, userId);
+      await room.save();
     }
 
     const { encryptedText, iv } = Message.encryptText(text);
 
     const message = await Message.create({
       chatRoom: req.params.roomId,
-      sender,
+      sender: senderName,
       encryptedText,
-      iv
+      iv,
+      sentAt: new Date()
     });
 
-    // Add message to the chatRoom
     await ChatRoom.findByIdAndUpdate(
       req.params.roomId,
       { $push: { messages: message._id } },
-      { new: true, useFindAndModify: false }
+      { new: true }
     );
 
     res.status(201).json({ success: true, message });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error sending message', details: err.message });
-  }
-});
-
-// Get all messages from a chat room (decrypts before sending)
-router.get('/:roomId/messages', async (req, res) => {
-  try {
-    const room = await ChatRoom.findById(req.params.roomId);
-    if (!room) return res.status(404).json({ error: 'Room not found' });
-
-    const messages = await Message.find({ chatRoom: req.params.roomId }).sort({ sentAt: 1 });
-
-    const decryptedMessages = messages.map(msg => {
-      let displaySender = msg.sender;
-      
-      // If anonymous mode is currently on, hide real names
-      if (room.anonymousMode) {
-        // If sender is already anonymous (Batman, etc.), keep it
-        // If sender is a real name, show as "Anonymous"
-        const isAlreadyAnonymous = anonymousNamePool.includes(msg.sender) || msg.sender.startsWith('Anonymous');
-        displaySender = isAlreadyAnonymous ? msg.sender : 'Anonymous';
-      }
-
-      return {
-        _id: msg._id,
-        sender: displaySender,
-        text: Message.decryptText(msg.encryptedText, msg.iv),
-        sentAt: msg.sentAt
-      };
-    });
-
-    res.json({ success: true, messages: decryptedMessages, anonymousMode: room.anonymousMode });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error retrieving messages', details: err.message });
   }
 });
 

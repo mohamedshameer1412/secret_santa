@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 const readline = require('readline');
-require('dotenv').config();
-
 const User = require('./models/User');
+const ChatRoom = require('./models/ChatRoom');
 const bcrypt = require('bcryptjs');
+require('dotenv').config();
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -41,8 +41,19 @@ async function resetAdmin(email, password) {
             await admin.save();
             console.log('Admin user created!');
         }
+
+        // Creates a default chat room for testing
+        let testRoom = await ChatRoom.findOne({ name: 'Self Chat' });
+        if (!testRoom) {
+            testRoom = await ChatRoom.createRoom('Self Chat', admin._id);
+            console.log('Default chat room created!');
+        } else {
+            console.log('Chat room already exists.');
+        }
+
         console.log(`Email: ${email}`);
         console.log(`Password: ${password}`);
+        console.log(`Chat Room ID: ${testRoom._id}`);
     } catch (err) {
 		console.error('Error resetting admin:', err);
     } finally {

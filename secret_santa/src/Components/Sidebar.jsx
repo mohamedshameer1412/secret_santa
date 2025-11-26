@@ -1,7 +1,11 @@
-// components/Sidebar.jsx
 import React from 'react';
+import { useAuth } from '../context/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 const Sidebar = ({ isOpen }) => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
   const menuItems = [
     { icon: 'fa-solid fa-house', label: 'Dashboard' },
     // { icon: 'fa-solid fa-door-open', label: 'Create/Join Room' },
@@ -14,6 +18,22 @@ const Sidebar = ({ isOpen }) => {
     { icon: 'fa-solid fa-users', label: 'Village People' },
     { icon: 'fa-solid fa-right-from-bracket', label: 'Logout' },
   ];
+
+    const handleMenuClick = async (item) => {
+        if (item.label === 'Logout') {
+            try {
+                await logout();
+            } catch (err) {
+                console.error('Logout failed:', err);
+            } finally {
+                navigate('/login');
+            }
+            return;
+        }
+
+        // navigate if item has a path (add path to menuItems for other entries)
+        if (item.path) navigate(item.path);
+    };
 
   return (
     <div className={`sidebar ${isOpen ? 'visible' : 'hide'}`}>
@@ -38,9 +58,14 @@ const Sidebar = ({ isOpen }) => {
       {/* Navigation Items */}
       <ul className="sidebar-menu px-3">
         {menuItems.map((item, index) => (
-          <li key={index} className="mb-3" style={{ cursor: 'pointer' }}>
-            <i className={`${item.icon} me-2`}></i> {item.label}
-          </li>
+            <li
+                key={index}
+                className="mb-3"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handleMenuClick(item)}
+                >
+                <i className={`${item.icon} me-2`}></i> {item.label}
+            </li>
         ))}
       </ul>
     </div>
