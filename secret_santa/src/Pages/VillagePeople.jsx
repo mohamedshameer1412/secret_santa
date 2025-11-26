@@ -60,11 +60,36 @@ const VillagePeople = () => {
     member.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleChat = (member) => {
-    console.log(`Start chat with ${member.name}`);
-    // TODO: Navigate to chat with specific user
-    // navigate(`/group-chat/${member.userId}`);
-  };
+    const handleChat = async (member) => {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+        navigate('/login');
+        return;
+        }
+
+        // Create or get private chat room
+        const res = await axios.post(
+        'http://localhost:5000/api/chat/private-room',
+        { otherUserId: member.userId },
+        { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (res.data.success && res.data.roomId) {
+        // Navigate to the private chat room
+        navigate(`/group-chat/${res.data.roomId}`, {
+            state: { 
+            isPrivate: true,
+            otherUser: member.name,
+            showConfetti: false
+            }
+        });
+        }
+    } catch (error) {
+        console.error('Error creating private chat:', error);
+        alert('Failed to start chat. Please try again.');
+    }
+    };
 
   const handleGroupChat = () => {
     navigate('/group-chat');

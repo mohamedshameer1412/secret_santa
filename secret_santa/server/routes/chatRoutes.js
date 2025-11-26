@@ -81,29 +81,23 @@ router.get('/my-rooms', protect, async (req, res) => {
 router.get('/:roomId', protect, async (req, res) => {
   try {
     const room = await ChatRoom.findById(req.params.roomId)
-      .populate('participants', 'name email username')
-      .populate('organizer', 'name email username');
+      .populate('organizer', 'name email username')
+      .populate('participants', 'name email username profilePic');
 
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
 
-    const isParticipant = room.participants.some(p => p._id.toString() === req.user.id);
+    // Check if user is participant
+    const isParticipant = room.participants.some(
+      p => p._id.toString() === req.user.id
+    );
+
     if (!isParticipant) {
       return res.status(403).json({ error: 'You are not a participant in this room' });
     }
 
-    res.json({
-      success: true,
-      room: {
-        _id: room._id,
-        name: room.name,
-        anonymousMode: room.anonymousMode,
-        organizer: room.organizer,
-        participants: room.participants,
-        createdAt: room.createdAt
-      }
-    });
+    res.json({ success: true, room });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error fetching room' });
@@ -217,6 +211,47 @@ router.post('/:roomId/message', protect, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error sending message', details: err.message });
+  }
+});
+
+// Get or create a private chat room between two users
+router.post('/private-room', protect, async (req, res) => {
+  try {
+    const { otherUserId } = req.body;
+    
+    if (!otherUserId) {
+      return res.status(400).json({ error: 'Other user ID is required' });
+    }
+
+    // Check if a private room already exists between these two users
+    // Sort user IDs to ensure consistent room lookup
+    const userIds = [req.user.id, otherUserId].sort();
+    
+    let room = await ChatRoom.findOne({
+      isPrivate: true,
+      participants: { $all: userIds, $size: 2 }
+    });
+
+    // If no room exists, create one
+    if (!room) {
+      const otherUser = await require('../models/User').findById(otherUserId);
+      if (!otherUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      room = await ChatRoom.create({
+        name: `Private Chat`, // Will be displayed differently on frontend
+        participants: userIds,
+        organizer: req.user.id,
+        anonymousMode: false,
+        isPrivate: true
+      });
+    }
+
+    res.json({ success: true, roomId: room._id });
+  } catch (err) {
+    console.error('Error creating/finding private room:', err);
+    res.status(500).json({ error: 'Error creating private chat' });
   }
 });
 

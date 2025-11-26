@@ -10,6 +10,18 @@ import confetti from 'canvas-confetti';
 
 const API_URL = 'http://localhost:5000/api/chat';
 
+const getPrivateChatName = (roomData, userId) => {
+    if (!roomData.isPrivate || !roomData.participants) return roomData.name;
+    
+    const otherParticipant = roomData.participants.find(
+        p => p._id?.toString() !== userId?.toString()
+    );
+    
+    return otherParticipant 
+        ? `Chat with ${otherParticipant.name || otherParticipant.username || 'User'}` 
+        : roomData.name;
+};
+    
 const GroupChat = () => {
     const { roomId } = useParams();
     const { user, loading: authLoading } = useAuth();
@@ -33,6 +45,13 @@ const GroupChat = () => {
 
     useEffect(() => {
         const fetchUserRooms = async () => {
+            if (authLoading) return; // Wait for auth to load
+            
+            if (!user) {
+                navigate('/login');
+                return;
+            }
+            
             try {
                 const token = localStorage.getItem('token');
                 if (!token) {
@@ -64,28 +83,42 @@ const GroupChat = () => {
         };
 
         fetchUserRooms();
-    }, [roomId, navigate, user]);
+    }, [roomId, navigate, user, authLoading]);
 
     const fetchRoomData = useCallback(async () => {
-        if (!roomId) return;
+        if (!roomId || !user) return;
         
         try {
             const token = localStorage.getItem('token');
-            if (!token) {
-                navigate('/login');
-                return;
-            }
             const res = await axios.get(`${API_URL}/${roomId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setRoom(res.data.room);
+            
+            // Calculate displayName inline instead of using separate function
+            let displayName = res.data.room.name;
+            if (res.data.room.isPrivate && res.data.room.participants) {
+                const otherParticipant = res.data.room.participants.find(
+                    p => p._id?.toString() !== user.id?.toString()
+                );
+                if (otherParticipant) {
+                    displayName = `Chat with ${otherParticipant.name || otherParticipant.username || 'User'}`;
+                }
+            }
+            
+            const roomData = {
+                ...res.data.room,
+                displayName
+            };
+            
+            setRoom(roomData);
         } catch (error) {
-            console.error('Error fetching room data:', error);
-            if (error.response?.status === 401) {
-                navigate('/login');
+            console.error('Error fetching room:', error);
+            if (error.response?.status === 404) {
+                alert('Chat room not found');
+                navigate('/dashboard');
             }
         }
-    }, [roomId, navigate]);
+    }, [roomId, navigate, user]);
 
     const fetchMessages = useCallback(async () => {
         if (!roomId) return;
@@ -167,6 +200,11 @@ const GroupChat = () => {
         if (message.trim()) {
             try {
                 const token = localStorage.getItem('token');
+                if (!token) {
+                    navigate('/login');
+                    return;
+                }
+                
                 await axios.post(
                     `${API_URL}/${roomId}/message`,
                     { text: message },
@@ -174,22 +212,17 @@ const GroupChat = () => {
                 );
                 
                 setUserTyping(false);
-                
-                const now = new Date();
-                setRawMessages((prev) => [
-                    ...prev,
-                    {
-                        senderId: user?.id,
-                        sender: user?.username,
-                        text: message,
-                        sentAt: now.toISOString()
-                    },
-                ]);
-                
                 setMessage('');
+                
+                // Fetch messages immediately after sending
+                fetchMessages();
             } catch (error) {
                 console.error('Error sending message:', error);
-                alert('Failed to send message. Please try again.');
+                if (error.response?.status === 401) {
+                    navigate('/login');
+                } else {
+                    alert('Failed to send message. Please try again.');
+                }
             }
         }
     };
@@ -271,15 +304,40 @@ const GroupChat = () => {
                     <div className=" d-flex flex-column flex-grow-1 w-100 h-100 mt-3 pt-3 border border-danger-subtle border-4 shadow-sm">
                         <div className="p-3 bg-white border-bottom border-danger-subtle">
                             <h5 className="mb-0 text-danger">
-                                <i className="fa-solid fa-users me-2"></i>
-                                {room?.name || 'Group Chat'}
+                                {room?.isPrivate ? (
+                                    <>
+                                        <i className="fa-solid fa-user-circle me-2"></i>
+                                        {room.displayName || getPrivateChatName(room)}
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fa-solid fa-users me-2"></i>
+                                        {room?.name || 'Group Chat'}
+                                    </>
+                                )}
+                                
+                                {/* Badges */}
                                 {room?.participants?.length === 1 && (
                                     <span className="badge bg-info ms-2">Personal</span>
                                 )}
                                 {room?.anonymousMode && (
                                     <span className="badge bg-secondary ms-2">Anonymous Mode</span>
                                 )}
+                                {room?.isPrivate && (
+                                    <span className="badge bg-success ms-2">
+                                        <i className="fa-solid fa-lock me-1"></i>
+                                        Private
+                                    </span>
+                                )}
                             </h5>
+                            
+                            {/* Show participant count for group chats */}
+                            {!room?.isPrivate && room?.participants?.length > 0 && (
+                                <small className="text-muted">
+                                    <i className="fa-solid fa-users me-1"></i>
+                                    {room.participants.length} {room.participants.length === 1 ? 'member' : 'members'}
+                                </small>
+                            )}
                         </div>
 
                         <div className=" flex-grow-1 d-flex flex-column justify-content-between animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)' }}>
@@ -400,17 +458,33 @@ const GroupChat = () => {
                                                             muted
                                                             playsInline
                                                             style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer' }}
-                                                            onClick={() => {
-                                                                setRawMessages((prev) => [
-                                                                    ...prev,
-                                                                    {
-                                                                        senderId: user?.id,
-                                                                        sender: user?.username,
-                                                                        text: `[GIF: ${mp4Url}]`,
-                                                                        sentAt: new Date().toISOString(),
-                                                                    },
-                                                                ]);
-                                                                setShowGifPicker(false);
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const token = localStorage.getItem('token');
+                                                                    if (!token) {
+                                                                        navigate('/login');
+                                                                        return;
+                                                                    }
+                                                                    
+                                                                    // Send GIF through API
+                                                                    await axios.post(
+                                                                        `${API_URL}/${roomId}/message`,
+                                                                        { text: `[GIF: ${mp4Url}]` },
+                                                                        { headers: { Authorization: `Bearer ${token}` } }
+                                                                    );
+                                                                    
+                                                                    setShowGifPicker(false);
+                                                                    
+                                                                    // Fetch messages to display the GIF
+                                                                    fetchMessages();
+                                                                } catch (error) {
+                                                                    console.error('Error sending GIF:', error);
+                                                                    if (error.response?.status === 401) {
+                                                                        navigate('/login');
+                                                                    } else {
+                                                                        alert('Failed to send GIF. Please try again.');
+                                                                    }
+                                                                }
                                                             }}
                                                         />
                                                     );

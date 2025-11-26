@@ -4,7 +4,6 @@ const roomSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    unique: true
   },
   participants: [
     {
@@ -25,17 +24,21 @@ const roomSchema = new mongoose.Schema({
   anonymousMode: {
     type: Boolean,
     default: false
-    },
+  },
   anonymousNames: {
     type: Map,
     of: String,
     default: new Map()
-    },
-    organizer: {
+  },
+  organizer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
-    }
+  },
+  isPrivate: {
+    type: Boolean,
+    default: false
+  }
 });
 
 // Static: Create a new room
@@ -62,6 +65,6 @@ roomSchema.statics.getRoom = async function (roomId) {
   return await this.findById(roomId).populate('participants');
 };
 
-const ChatRoom = mongoose.model('ChatRoom', roomSchema); // ✅ Renamed for consistency
+const ChatRoom = mongoose.model('ChatRoom', roomSchema);
 
 module.exports = ChatRoom;
