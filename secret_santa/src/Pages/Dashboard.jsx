@@ -1,26 +1,60 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from '../context/useAuth';
+import axios from 'axios';
 import Navbar from '../Components/Navbar';
 import Sidebar from '../Components/Sidebar';
 
+const API_URL = 'http://localhost:5000/api/children';
+
 const ChildReveal = () => {
-  const names = ["Aryan", "Meena", "Ravi", "Lila", "Nisha", "Ayaan"];
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  
+  const [names, setNames] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [drawStarted, setDrawStarted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showModal, setShowModal] = useState(false);  // initially false
+  const [showModal, setShowModal] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const backdropRef = useRef(null);
-  const navigate = useNavigate();
-
   const ITEM_HEIGHT = 120;
 
+  // Fetch stats on mount
   useEffect(() => {
-    const stored = localStorage.getItem("selectedChild");
-    if (stored) {
-      navigate("/child-profile");
-    }
-  }, [navigate]);
+    const fetchStats = async () => {
+      if (authLoading) return;
+      
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`${API_URL}/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        setStats(res.data.stats);
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [authLoading, user, navigate]);
+
+  // Load available names for slot machine
+  useEffect(() => {
+    // You can fetch from backend or use predefined list
+    const childNames = ["Aryan", "Meena", "Ravi", "Lila", "Nisha", "Ayaan", "Priya", "Rohan"];
+    setNames(childNames);
+  }, []);
 
   useEffect(() => {
     if (!showModal || !backdropRef.current) return;
@@ -39,25 +73,54 @@ const ChildReveal = () => {
     }
   }, [showModal]);
 
-  const handleDraw = () => {
+  const handleDraw = async () => {
     if (drawStarted) return;
     setDrawStarted(true);
 
     const chosenIdx = Math.floor(Math.random() * names.length);
     setSelectedIndex(chosenIdx);
 
-    localStorage.setItem("selectedChild", JSON.stringify({ name: names[chosenIdx] }));
-
     const sound = new Audio("/sounds/reveal.mp3");
     sound.play();
 
-    setTimeout(() => {
-      navigate("/child-profile");
-    }, 3500);
+    // Call backend API to reveal child
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${API_URL}/reveal`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setTimeout(() => {
+        localStorage.setItem("selectedChild", JSON.stringify(res.data.child));
+        navigate("/child-profile");
+      }, 3500);
+    } catch (error) {
+      console.error('Error revealing child:', error);
+      
+      if (error.response?.status === 400) {
+        alert(error.response.data.error);
+        setDrawStarted(false);
+        setShowModal(false);
+        return;
+      }
+      
+      alert('Failed to reveal child. Please try again.');
+      setDrawStarted(false);
+    }
   };
 
   const finalIndex = selectedIndex !== null ? selectedIndex + names.length : 0;
   const translateY = -finalIndex * ITEM_HEIGHT;
+
+  if (authLoading || loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center vh-100">
+        <div className="spinner-border text-danger" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="d-flex flex-column w-100 vh-100">
@@ -84,7 +147,9 @@ const ChildReveal = () => {
                     <i className="bi bi-people-fill fs-1 text-danger"></i>
                     <div>
                       <h5 className="card-title mb-1">Total Children</h5>
-                      <p className="card-text fs-4 fw-semibold mb-0">6</p>
+                      <p className="card-text fs-4 fw-semibold mb-0">
+                        {stats?.totalChildren || 0}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -97,8 +162,9 @@ const ChildReveal = () => {
                     <div>
                       <h5 className="card-title mb-1">Last Generated</h5>
                       <p className="card-text fs-6 text-muted mb-0">
-                        {/* You can replace with dynamic date */}
-                        2 days ago
+                        {stats?.lastRevealed 
+                          ? new Date(stats.lastRevealed).toLocaleDateString()
+                          : 'Never'}
                       </p>
                     </div>
                   </div>
@@ -108,11 +174,11 @@ const ChildReveal = () => {
               <div className="col-12 col-md-4">
                 <div className="card shadow-sm border-danger h-100">
                   <div className="card-body d-flex align-items-center gap-3">
-                    <i className="bi bi-gift-fill fs-1 text-danger"></i>
+                    <i className="bi bi-lightbulb-fill fs-1 text-danger"></i>
                     <div>
-                      <h5 className="card-title mb-1">Fun Fact</h5>
-                      <p className="card-text mb-0">
-                        Every child is unique and special!
+                      <h5 className="card-title mb-1">Clues Revealed</h5>
+                      <p className="card-text fs-4 fw-semibold mb-0">
+                        {stats?.totalCluesRevealed || 0}
                       </p>
                     </div>
                   </div>
