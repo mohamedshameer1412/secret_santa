@@ -31,7 +31,44 @@ const GroupChat = () => {
     const inputRef = useRef(null);
     const typingTimeoutRef = useRef(null);
 
+    useEffect(() => {
+        const fetchUserRooms = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    navigate('/login');
+                    return;
+                }
+                
+                // If no roomId, fetch user's rooms and redirect to first one
+                if (!roomId && user) {
+                    const res = await axios.get(`${API_URL}/my-rooms`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    
+                    if (res.data.rooms && res.data.rooms.length > 0) {
+                        // Redirect to first room
+                        navigate(`/group-chat/${res.data.rooms[0]._id}`, { replace: true });
+                    } else {
+                        // No rooms found, redirect to dashboard
+                        alert('No chat rooms found. Please create or join a room first.');
+                        navigate('/dashboard');
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching rooms:', error);
+                if (error.response?.status === 401) {
+                    navigate('/login');
+                }
+            }
+        };
+
+        fetchUserRooms();
+    }, [roomId, navigate, user]);
+
     const fetchRoomData = useCallback(async () => {
+        if (!roomId) return;
+        
         try {
             const token = localStorage.getItem('token');
             if (!token) {
@@ -51,6 +88,8 @@ const GroupChat = () => {
     }, [roomId, navigate]);
 
     const fetchMessages = useCallback(async () => {
+        if (!roomId) return;
+        
         try {
             const token = localStorage.getItem('token');
             if (!token) {
@@ -73,7 +112,7 @@ const GroupChat = () => {
     }, [roomId, navigate]);
 
     const messages = useMemo(() => {
-        if (!user) return []; // Don't format if user not loaded yet
+        if (!user) return [];
         
         return rawMessages.map(msg => {
             const isCurrentUser = msg.senderId === user.id || msg.sender === user.username;
@@ -96,23 +135,17 @@ const GroupChat = () => {
                 origin: { y: 0.6 },
                 colors: ['#cc0000', '#00aa00', '#ffffff', '#ffd700']
             });
-            // Remove the state so it doesn't repeat
             window.history.replaceState({}, document.title);
         }
     }, [location]);
     
     // Fetch room details and messages on mount
     useEffect(() => {
-        if (!roomId) {
-            navigate('/dashboard');
-            return;
-        }
-
-        if (!user) return;
+        if (!roomId || !user) return;
 
         fetchRoomData();
         fetchMessages();
-    }, [roomId, navigate, fetchRoomData, fetchMessages, user]);
+    }, [roomId, fetchRoomData, fetchMessages, user]);
 
     // Typing indicator logic
     const setUserTyping = (isTyping) => {
@@ -120,9 +153,7 @@ const GroupChat = () => {
             if (!typingUsers.includes('You')) {
                 setTypingUsers(prev => [...prev, 'You']);
             }
-            // Clear existing timeout
             clearTimeout(typingTimeoutRef.current);
-            // Set new timeout to remove typing indicator after 1.5s of inactivity
             typingTimeoutRef.current = setTimeout(() => {
                 setTypingUsers(prev => prev.filter(n => n !== 'You'));
             }, 1500);
@@ -179,7 +210,6 @@ const GroupChat = () => {
         }
     };
 
-    // Cleanup timeout on unmount
     useEffect(() => {
         return () => clearTimeout(typingTimeoutRef.current);
     }, []);
@@ -211,10 +241,10 @@ const GroupChat = () => {
 
     // Poll for new messages every 3 seconds
     useEffect(() => {
-        if (!user) return;
+        if (!user || !roomId) return;
 
         const interval = setInterval(() => {
-            if (roomId) fetchMessages();
+            fetchMessages();
         }, 3000);
         return () => clearInterval(interval);
     }, [roomId, fetchMessages, user]);
@@ -233,7 +263,7 @@ const GroupChat = () => {
         <div className="d-flex flex-column vh-100 w-100 ">
             <Navbar toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
             <div className="d-flex flex-grow-1">
-                <Sidebar isOpen={sidebarOpen} />
+                <Sidebar isOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
                 <main
                     className={`d-flex flex-column flex-grow-1 content ${sidebarOpen ? '' : 'shifted'}`}
                     style={{ marginTop: '56px' }}
@@ -376,9 +406,8 @@ const GroupChat = () => {
                                                                     {
                                                                         senderId: user?.id,
                                                                         sender: user?.username,
-                                                                        text: <video src={mp4Url} autoPlay loop muted playsInline style={{ width: '120px', borderRadius: '12px' }} />,
+                                                                        text: `[GIF: ${mp4Url}]`,
                                                                         sentAt: new Date().toISOString(),
-                                                                        img: '/assets/santa2.png',
                                                                     },
                                                                 ]);
                                                                 setShowGifPicker(false);

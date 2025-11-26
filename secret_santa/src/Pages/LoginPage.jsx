@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import './LoginPage.css';
 
 const LoginPage = () => {
@@ -21,33 +20,9 @@ const LoginPage = () => {
 
         try {
             // Login and get response
-            const response = await login(email, password);
+            await login(email, password);
             
-            // Get token from response or localStorage
-            const token = response?.token || localStorage.getItem('token');
-            
-            if (!token) {
-                throw new Error('Authentication failed - no token received');
-            }
-
-            // Try to fetch user's rooms
-            try {
-                const roomsRes = await axios.get('http://localhost:5000/api/chat/my-rooms', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                
-                const firstRoomId = roomsRes.data?.rooms?.[0]?._id;
-                if (firstRoomId) {
-                    // Navigate to chat with confetti flag
-                    navigate(`/chat/${firstRoomId}`, { state: { showConfetti: true } });
-                    return;
-                }
-            } catch (err) {
-                console.warn('Could not fetch rooms:', err);
-            }
-
-            // Fallback - navigate to dashboard
-            navigate('/dashboard');
+            navigate('/dashboard', { state: { showConfetti: true } });
         } catch (err) {
             setError(err.message || 'Failed to login');
         } finally {
@@ -57,7 +32,6 @@ const LoginPage = () => {
 
     return (
         <div className="login-page d-flex align-items-center justify-content-center p-2">
-            {/* ...rest of your JSX remains the same... */}
             <div className="row justify-content-center align-items-center shadow-lg rounded-4 p-0 p-md-2 overflow-hidden glossy glass-effect login-container">
                 <div className="col-md-5 p-0 h-100 image-container">
                     <img

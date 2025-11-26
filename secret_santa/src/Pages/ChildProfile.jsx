@@ -13,7 +13,7 @@ const dareSuggestions = {
 const newAvatar = "https://i.pravatar.cc/150?img=12";
 
 const glassColors = {
-  bg: "rgba(255, 255, 255, 0.05)", // subtle translucent, no solid bg color
+  bg: "rgba(255, 255, 255, 0.05)",
   border: "rgba(204, 0, 0, 0.5)",
   shadow: "0 8px 32px 0 rgba(204, 0, 0, 0.25)",
   text: "#cc0000",
@@ -22,7 +22,7 @@ const glassColors = {
 const ChildProfile = () => {
   const navigate = useNavigate();
   const [childData, setChildData] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [newClue, setNewClue] = useState("");
   const [newDare, setNewDare] = useState("");
@@ -37,14 +37,22 @@ const ChildProfile = () => {
       if (data) {
         setChildData(JSON.parse(data));
       } else {
-        navigate("/draw");
+        navigate("/dashboard");
       }
     } catch {
-      navigate("/draw");
+      navigate("/dashboard");
     }
   }, [navigate]);
 
-  if (!childData) return null;
+  if (!childData) {
+    return (
+      <div className="d-flex justify-content-center align-items-center vh-100">
+        <div className="spinner-border text-danger" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   const handleAddClue = () => {
     if (newClue.trim()) {
@@ -102,18 +110,19 @@ const ChildProfile = () => {
         /* Flex utilities */
         .d-flex { display: flex; }
         .flex-column { flex-direction: column; }
+        .flex-grow-1 { flex-grow: 1; }
         .vh-100 { height: 100vh; }
         .w-100 { width: 100%; }
 
         main.content {
           flex-grow: 1;
           padding: 2rem 3rem;
-          margin-top: 60px;
+          margin-top: 56px;
           overflow-y: auto;
           transition: margin-left 0.3s ease;
         }
         main.content.shifted {
-          margin-left: 250px;
+          margin-left: 0;
         }
         .container-fluid {
           max-width: 1200px;
@@ -124,10 +133,10 @@ const ChildProfile = () => {
           flex-wrap: wrap;
           gap: 2rem;
         }
-        .col-lg-4 { flex: 0 0 33.3333%; max-width: 33.3333%; padding: 0; }
-        .col-lg-8 { flex: 0 0 66.6667%; max-width: 66.6667%; padding: 0; }
+        .col-lg-4 { flex: 0 0 calc(33.3333% - 1.33rem); max-width: calc(33.3333% - 1.33rem); }
+        .col-lg-8 { flex: 0 0 calc(66.6667% - 0.67rem); max-width: calc(66.6667% - 0.67rem); }
 
-        /* Glass card without heavy bg */
+        /* Glass card */
         .glass-card {
           background: ${glassColors.bg};
           border: 1.5px solid ${glassColors.border};
@@ -181,9 +190,13 @@ const ChildProfile = () => {
           border-color: ${glassColors.text};
           box-shadow: 0 0 8px 0 ${glassColors.text};
         }
-        .btn-danger:hover {
+        .btn-danger:hover:not(:disabled) {
           background: #a30000;
           box-shadow: 0 0 14px 3px #a30000;
+        }
+        .btn-danger:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
         .btn-outline-danger {
           background: transparent;
@@ -207,7 +220,6 @@ const ChildProfile = () => {
           padding: 0.5rem 1rem;
           font-size: 1rem;
           outline: none;
-          user-select: text;
           transition: border-color 0.3s ease, background-color 0.3s ease;
         }
         .form-control:focus {
@@ -216,23 +228,8 @@ const ChildProfile = () => {
           background: rgba(204, 0, 0, 0.15);
           color: #fff;
         }
-
-        /* Badges */
-        .badge {
-          font-weight: 600;
-          font-size: 0.85rem;
-          background: rgba(204, 0, 0, 0.6);
-          color: #fff;
-          margin: 0.15rem;
-          padding: 0.5rem 1rem;
-          border-radius: 20px;
-          user-select: none;
-          box-shadow: 0 0 6px 0 rgba(204, 0, 0, 0.7);
-          transition: background-color 0.3s ease;
-        }
-        .badge:hover {
-          background-color: #a30000;
-          cursor: default;
+        .form-control::placeholder {
+          color: rgba(204, 0, 0, 0.5);
         }
 
         /* Modal */
@@ -261,12 +258,14 @@ const ChildProfile = () => {
           box-shadow: ${glassColors.shadow};
           padding: 1.5rem;
           border-radius: 15px;
+          backdrop-filter: blur(10px);
         }
         .modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           border-bottom: 1px solid rgba(204, 0, 0, 0.4);
+          padding-bottom: 1rem;
           margin-bottom: 1rem;
         }
         .modal-title {
@@ -336,7 +335,7 @@ const ChildProfile = () => {
           to { transform: translateY(0); opacity: 1; }
         }
 
-        /* Scrollbar for main content */
+        /* Scrollbar */
         main.content::-webkit-scrollbar {
           width: 8px;
         }
@@ -344,187 +343,197 @@ const ChildProfile = () => {
           background-color: #cc0000aa;
           border-radius: 10px;
         }
+
+        @media (max-width: 992px) {
+          .col-lg-4, .col-lg-8 {
+            flex: 0 0 100%;
+            max-width: 100%;
+          }
+        }
       `}</style>
 
-      <div className="d-flex vh-100 w-100">
-        <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
-        <main className={`content ${sidebarOpen ? "shifted" : ""}`}>
-          <Navbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <div className="d-flex flex-column vh-100 w-100">
+        <Navbar toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        
+        <div className="d-flex flex-grow-1">
+          <Sidebar isOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <div className="container-fluid">
-            <h2 style={{ color: glassColors.text, marginBottom: "1.5rem", userSelect: "none" }}>
-              Child Profile: <span style={{ fontWeight: "700" }}>{childData.name}</span>
-            </h2>
+          <main className={`content ${sidebarOpen ? '' : 'shifted'}`}>
+            <div className="container-fluid">
+              <h2 style={{ color: glassColors.text, marginBottom: "1.5rem", userSelect: "none" }}>
+                Child Profile: <span style={{ fontWeight: "700" }}>{childData.name}</span>
+              </h2>
 
-            <div className="row">
-              {/* Left Panel */}
-              <section className="col-lg-4 glass-card" aria-label="Child Information">
-                <img
-                  src={newAvatar}
-                  alt={`${childData.name} avatar`}
-                  className="avatar-img"
-                  draggable={false}
-                />
-                <h3 style={{ marginBottom: "0.5rem", userSelect: "none" }}>{childData.name}</h3>
-                <p><strong>Age:</strong> {childData.age}</p>
-
-                <hr style={{ borderColor: glassColors.border, margin: "1.5rem 0" }} />
-
-                <div>
-                  <h4>Clues</h4>
-                  <ul style={{ paddingLeft: "1.2rem" }}>
-                    {(childData.clues && childData.clues.length > 0) ? (
-                      childData.clues.map((clue, idx) => (
-                        <li key={idx} style={{ marginBottom: "0.5rem" }}>{clue}</li>
-                      ))
-                    ) : (
-                      <li style={{ fontStyle: "italic", color: "#900000" }}>No clues added yet.</li>
-                    )}
-                  </ul>
-
-                  <div className="d-flex" style={{ marginTop: "1rem", gap: "0.8rem" }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Add new clue"
-                      value={newClue}
-                      onChange={(e) => setNewClue(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddClue()}
-                      aria-label="Add new clue"
-                    />
-                    <button
-                      className="btn-danger"
-                      onClick={handleAddClue}
-                      aria-label="Add clue button"
-                      disabled={!newClue.trim()}
-                      type="button"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              {/* Right Panel */}
-              <section className="col-lg-8 glass-card" aria-label="Child Dare Section">
-                <h4>Current Dare</h4>
-                {childData.dare ? (
-                  <p style={{ fontSize: "1.25rem", fontWeight: "600" }}>{childData.dare}</p>
-                ) : (
-                  <p style={{ fontStyle: "italic", color: "#900000" }}>No dare assigned yet.</p>
-                )}
-
-                <button
-                  className="btn-outline-danger"
-                  onClick={() => setShowDareModal(true)}
-                  type="button"
-                  aria-haspopup="dialog"
-                >
-                  Assign a New Dare
-                </button>
-
-                {childData.proof && (
-                  <>
-                    <h5 style={{ marginTop: "1.5rem" }}>Proof of Completion</h5>
-                    <img
-                      src={childData.proof}
-                      alt="Proof of dare completion"
-                      className="proof-img"
-                      draggable={false}
-                    />
-                  </>
-                )}
-
-                <div style={{ marginTop: "1.5rem" }}>
-                  <label
-                    htmlFor="proofUpload"
-                    className="btn-danger"
-                    style={{ cursor: "pointer", display: "inline-block" }}
-                  >
-                    Upload Proof
-                  </label>
-                  <input
-                    type="file"
-                    id="proofUpload"
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={handleProofChange}
-                    aria-label="Upload proof image"
+              <div className="row">
+                {/* Left Panel */}
+                <section className="col-lg-4 glass-card" aria-label="Child Information">
+                  <img
+                    src={newAvatar}
+                    alt={`${childData.name} avatar`}
+                    className="avatar-img"
+                    draggable={false}
                   />
-                </div>
-              </section>
-            </div>
-          </div>
+                  <h3 style={{ marginBottom: "0.5rem", userSelect: "none" }}>{childData.name}</h3>
+                  <p><strong>Age:</strong> {childData.age}</p>
 
-          {/* Dare Modal */}
-          {showDareModal && (
-            <div className="modal" role="dialog" aria-modal="true" aria-labelledby="dareModalTitle">
-              <div className="modal-dialog">
-                <div className="modal-content">
-                  <div className="modal-header">
-                    <h5 className="modal-title" id="dareModalTitle">Assign a New Dare</h5>
-                    <button
-                      type="button"
-                      className="btn-close"
-                      aria-label="Close"
-                      onClick={() => setShowDareModal(false)}
-                    >
-                      &times;
-                    </button>
-                  </div>
+                  <hr style={{ borderColor: glassColors.border, margin: "1.5rem 0" }} />
 
-                  <textarea
-                    className="form-control"
-                    rows={4}
-                    placeholder="Enter dare here..."
-                    value={newDare}
-                    onChange={handleDareChange}
-                    aria-describedby="dareSuggestions"
-                  />
+                  <div>
+                    <h4>Clues</h4>
+                    <ul style={{ paddingLeft: "1.2rem" }}>
+                      {(childData.clues && childData.clues.length > 0) ? (
+                        childData.clues.map((clue, idx) => (
+                          <li key={idx} style={{ marginBottom: "0.5rem" }}>{clue}</li>
+                        ))
+                      ) : (
+                        <li style={{ fontStyle: "italic", color: "#900000" }}>No clues added yet.</li>
+                      )}
+                    </ul>
 
-                  {/* Suggestions */}
-                  {suggestedDares.length > 0 && (
-                    <div
-                      id="dareSuggestions"
-                      style={{ marginTop: "1rem", display: "flex", flexWrap: "wrap", gap: "0.7rem" }}
-                      aria-label="Dare suggestions"
-                    >
-                      {suggestedDares.map((suggestion, idx) => (
-                        <button
-                          key={idx}
-                          className={`suggestion-btn ${selectedSuggestion === suggestion ? "selected" : ""}`}
-                          type="button"
-                          onClick={() => handleSelectSuggestion(suggestion)}
-                          aria-pressed={selectedSuggestion === suggestion}
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
+                    <div className="d-flex" style={{ marginTop: "1rem", gap: "0.8rem" }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Add new clue"
+                        value={newClue}
+                        onChange={(e) => setNewClue(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddClue()}
+                        aria-label="Add new clue"
+                      />
+                      <button
+                        className="btn-danger"
+                        onClick={handleAddClue}
+                        aria-label="Add clue button"
+                        disabled={!newClue.trim()}
+                        type="button"
+                      >
+                        Add
+                      </button>
                     </div>
+                  </div>
+                </section>
+
+                {/* Right Panel */}
+                <section className="col-lg-8 glass-card" aria-label="Child Dare Section">
+                  <h4>Current Dare</h4>
+                  {childData.dare ? (
+                    <p style={{ fontSize: "1.25rem", fontWeight: "600" }}>{childData.dare}</p>
+                  ) : (
+                    <p style={{ fontStyle: "italic", color: "#900000" }}>No dare assigned yet.</p>
                   )}
 
-                  <div className="modal-footer">
-                    <button
-                      className="btn-outline-danger"
-                      onClick={() => setShowDareModal(false)}
-                      type="button"
-                    >
-                      Cancel
-                    </button>
-                    <button
+                  <button
+                    className="btn-outline-danger"
+                    onClick={() => setShowDareModal(true)}
+                    type="button"
+                    aria-haspopup="dialog"
+                  >
+                    Assign a New Dare
+                  </button>
+
+                  {childData.proof && (
+                    <>
+                      <h5 style={{ marginTop: "1.5rem" }}>Proof of Completion</h5>
+                      <img
+                        src={childData.proof}
+                        alt="Proof of dare completion"
+                        className="proof-img"
+                        draggable={false}
+                      />
+                    </>
+                  )}
+
+                  <div style={{ marginTop: "1.5rem" }}>
+                    <label
+                      htmlFor="proofUpload"
                       className="btn-danger"
-                      onClick={handleAssignDare}
-                      disabled={!newDare.trim()}
-                      type="button"
+                      style={{ cursor: "pointer", display: "inline-block" }}
                     >
-                      Assign Dare
-                    </button>
+                      Upload Proof
+                    </label>
+                    <input
+                      type="file"
+                      id="proofUpload"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={handleProofChange}
+                      aria-label="Upload proof image"
+                    />
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            {/* Dare Modal */}
+            {showDareModal && (
+              <div className="modal" role="dialog" aria-modal="true" aria-labelledby="dareModalTitle">
+                <div className="modal-dialog">
+                  <div className="modal-content">
+                    <div className="modal-header">
+                      <h5 className="modal-title" id="dareModalTitle">Assign a New Dare</h5>
+                      <button
+                        type="button"
+                        className="btn-close"
+                        aria-label="Close"
+                        onClick={() => setShowDareModal(false)}
+                      >
+                        &times;
+                      </button>
+                    </div>
+
+                    <textarea
+                      className="form-control"
+                      rows={4}
+                      placeholder="Enter dare here..."
+                      value={newDare}
+                      onChange={handleDareChange}
+                      aria-describedby="dareSuggestions"
+                    />
+
+                    {/* Suggestions */}
+                    {suggestedDares.length > 0 && (
+                      <div
+                        id="dareSuggestions"
+                        style={{ marginTop: "1rem", display: "flex", flexWrap: "wrap", gap: "0.7rem" }}
+                        aria-label="Dare suggestions"
+                      >
+                        {suggestedDares.map((suggestion, idx) => (
+                          <button
+                            key={idx}
+                            className={`suggestion-btn ${selectedSuggestion === suggestion ? "selected" : ""}`}
+                            type="button"
+                            onClick={() => handleSelectSuggestion(suggestion)}
+                            aria-pressed={selectedSuggestion === suggestion}
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="modal-footer">
+                      <button
+                        className="btn-outline-danger"
+                        onClick={() => setShowDareModal(false)}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="btn-danger"
+                        onClick={handleAssignDare}
+                        disabled={!newDare.trim()}
+                        type="button"
+                      >
+                        Assign Dare
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </main>
+            )}
+          </main>
+        </div>
       </div>
     </>
   );

@@ -11,13 +11,9 @@ import VillagePeople from './Pages/VillagePeople';
 import MyWishlist from './Pages/MyWishlist';
 import ChildProfile from './Pages/ChildProfile';
 
-
 function App() {
   return (
     <Routes>
-      {/* Secret Santa Routes */}
-
-
       {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
@@ -27,8 +23,9 @@ function App() {
       {/* Protected Routes */}
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/child-profile" element={<ChildProfile />} />
-      <Route path="/chat" element={<GroupChat />} />
-      <Route path="/contact" element={<VillagePeople />} />
+      <Route path="/group-chat" element={<GroupChat />} /> 
+      <Route path="/group-chat/:roomId" element={<GroupChat />} />
+      <Route path="/village-people" element={<VillagePeople />} />
       <Route path="/wishlist" element={<MyWishlist />} />
 
       {/* Redirect root to login */}

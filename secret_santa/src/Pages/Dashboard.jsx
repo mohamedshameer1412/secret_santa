@@ -62,7 +62,7 @@ const ChildReveal = () => {
   return (
     <div className="d-flex flex-column w-100 vh-100">
       <Navbar toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-      <Sidebar isOpen={sidebarOpen} />
+      <Sidebar isOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       <main
         className={`content ${sidebarOpen ? '' : 'shifted'} py-4 px-3 px-md-5 mt-5`}
