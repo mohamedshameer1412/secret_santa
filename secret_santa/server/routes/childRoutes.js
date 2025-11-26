@@ -64,10 +64,13 @@ router.post('/reveal', protect, async (req, res) => {
       revealedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
     }).sort({ revealedAt: -1 });
 
+
     if (existingChild) {
-      return res.status(400).json({ 
-        error: 'You already have an active child. Wait 7 days to reveal a new one.',
-        child: existingChild
+      return res.json({ 
+        success: true,
+        child: existingChild,
+        message: `You already revealed ${existingChild.name}!`,
+        alreadyRevealed: true
       });
     }
 
@@ -94,7 +97,8 @@ router.post('/reveal', protect, async (req, res) => {
     res.json({ 
       success: true, 
       child,
-      message: `You've been matched with ${randomName}, age ${randomAge}!`
+      message: `You've been matched with ${randomName}, age ${randomAge}!`,
+      alreadyRevealed: false
     });
   } catch (error) {
     console.error('Error revealing child:', error);

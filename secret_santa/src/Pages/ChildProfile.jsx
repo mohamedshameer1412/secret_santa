@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from '../context/useAuth';
+import axios from 'axios';
 import Navbar from "../Components/Navbar";
 import Sidebar from "../Components/Sidebar";
 
@@ -21,6 +23,7 @@ const glassColors = {
 
 const ChildProfile = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [childData, setChildData] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -31,38 +34,76 @@ const ChildProfile = () => {
   const [suggestedDares, setSuggestedDares] = useState([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState("");
 
-  useEffect(() => {
+    const API_URL = 'http://localhost:5000/api/children';
+
+    useEffect(() => {
+    const fetchChild = async () => {
+        if (authLoading) return;
+        
+        if (!user) {
+        navigate('/login');
+        return;
+        }
+
+        try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`${API_URL}/current`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        setChildData(res.data.child);
+        } catch (error) {
+        console.error('Error fetching child:', error);
+        
+        if (error.response?.status === 404) {
+            alert('No child found. Please generate one first!');
+            navigate('/dashboard');
+            return;
+        }
+        
+        if (error.response?.status === 401) {
+            navigate('/login');
+        }
+        }
+    };
+
+    fetchChild();
+    }, [authLoading, user, navigate]);
+
+    if (authLoading || !childData) {
+        return (
+            <div className="d-flex justify-content-center align-items-center vh-100">
+                <div className="spinner-border text-danger" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        );
+    }
+
+    const handleAddClue = async () => {
+    if (!newClue.trim() || !childData) return;
+    
     try {
-      const data = localStorage.getItem("selectedChild");
-      if (data) {
-        setChildData(JSON.parse(data));
-      } else {
-        navigate("/dashboard");
-      }
-    } catch {
-      navigate("/dashboard");
+        const token = localStorage.getItem('token');
+        const res = await axios.post(
+        `${API_URL}/${childData._id}/clue`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        setChildData(res.data.child);
+        setNewClue('');
+        alert(res.data.message);
+    } catch (error) {
+        console.error('Error adding clue:', error);
+        
+        if (error.response?.status === 400) {
+        alert(error.response.data.error);
+        } else {
+        alert('Failed to add clue. Please try again.');
+        }
     }
-  }, [navigate]);
-
-  if (!childData) {
-    return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="spinner-border text-danger" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
-  const handleAddClue = () => {
-    if (newClue.trim()) {
-      const updatedClues = childData.clues ? [...childData.clues, newClue.trim()] : [newClue.trim()];
-      const updatedChild = { ...childData, clues: updatedClues };
-      setChildData(updatedChild);
-      localStorage.setItem("selectedChild", JSON.stringify(updatedChild));
-      setNewClue("");
-    }
-  };
+    };
 
   const handleDareChange = (e) => {
     setNewDare(e.target.value);
@@ -76,17 +117,27 @@ const ChildProfile = () => {
     setSuggestedDares(dareSuggestions[matchedKey]);
   };
 
-  const handleAssignDare = () => {
-    if (newDare.trim()) {
-      const updatedChild = { ...childData, dare: newDare.trim() };
-      setChildData(updatedChild);
-      localStorage.setItem("selectedChild", JSON.stringify(updatedChild));
-      setShowDareModal(false);
-      setNewDare("");
-      setSuggestedDares([]);
-      setSelectedSuggestion("");
+    const handleAssignDare = async () => {
+    if (!newDare.trim() || !childData) return;
+    
+    try {
+        const token = localStorage.getItem('token');
+        const res = await axios.put(
+        `${API_URL}/${childData._id}`,
+        { dare: { text: newDare.trim() } },
+        { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        setChildData(res.data.child);
+        setShowDareModal(false);
+        setNewDare("");
+        setSuggestedDares([]);
+        setSelectedSuggestion("");
+    } catch (error) {
+        console.error('Error assigning dare:', error);
+        alert('Failed to assign dare. Please try again.');
     }
-  };
+    };
 
   const handleSelectSuggestion = (suggestion) => {
     setNewDare(suggestion);
@@ -381,13 +432,19 @@ const ChildProfile = () => {
                   <div>
                     <h4>Clues</h4>
                     <ul style={{ paddingLeft: "1.2rem" }}>
-                      {(childData.clues && childData.clues.length > 0) ? (
+                    {(childData.clues && childData.clues.length > 0) ? (
                         childData.clues.map((clue, idx) => (
-                          <li key={idx} style={{ marginBottom: "0.5rem" }}>{clue}</li>
+                        <li key={clue._id || idx} style={{ marginBottom: "0.5rem" }}>
+                            {clue.text}
+                            <br />
+                            <small style={{ color: "#900000" }}>
+                            Revealed: {new Date(clue.revealedAt).toLocaleDateString()}
+                            </small>
+                        </li>
                         ))
-                      ) : (
+                    ) : (
                         <li style={{ fontStyle: "italic", color: "#900000" }}>No clues added yet.</li>
-                      )}
+                    )}
                     </ul>
 
                     <div className="d-flex" style={{ marginTop: "1rem", gap: "0.8rem" }}>
@@ -416,11 +473,11 @@ const ChildProfile = () => {
                 {/* Right Panel */}
                 <section className="col-lg-8 glass-card" aria-label="Child Dare Section">
                   <h4>Current Dare</h4>
-                  {childData.dare ? (
-                    <p style={{ fontSize: "1.25rem", fontWeight: "600" }}>{childData.dare}</p>
-                  ) : (
+                    {childData.dare?.text ? (
+                    <p style={{ fontSize: "1.25rem", fontWeight: "600" }}>{childData.dare.text}</p>
+                    ) : (
                     <p style={{ fontStyle: "italic", color: "#900000" }}>No dare assigned yet.</p>
-                  )}
+                    )}
 
                   <button
                     className="btn-outline-danger"

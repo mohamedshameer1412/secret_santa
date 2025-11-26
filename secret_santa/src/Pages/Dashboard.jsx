@@ -73,41 +73,48 @@ const ChildReveal = () => {
     }
   }, [showModal]);
 
-  const handleDraw = async () => {
-    if (drawStarted) return;
-    setDrawStarted(true);
+    const handleDraw = async () => {
+        if (drawStarted) return;
+        setDrawStarted(true);
 
-    const chosenIdx = Math.floor(Math.random() * names.length);
-    setSelectedIndex(chosenIdx);
+        const chosenIdx = Math.floor(Math.random() * names.length);
+        setSelectedIndex(chosenIdx);
 
-    const sound = new Audio("/sounds/reveal.mp3");
-    sound.play();
+        const sound = new Audio("/sounds/reveal.mp3");
+        sound.play().catch(() => {}); // Ignore sound errors
 
-    // Call backend API to reveal child
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(`${API_URL}/reveal`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        // Call backend API to reveal child
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${API_URL}/reveal`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+            });
 
-      setTimeout(() => {
-        localStorage.setItem("selectedChild", JSON.stringify(res.data.child));
-        navigate("/child-profile");
-      }, 3500);
-    } catch (error) {
-      console.error('Error revealing child:', error);
-      
-      if (error.response?.status === 400) {
-        alert(error.response.data.error);
-        setDrawStarted(false);
-        setShowModal(false);
-        return;
-      }
-      
-      alert('Failed to reveal child. Please try again.');
-      setDrawStarted(false);
-    }
-  };
+            // Check if it's an existing child
+            if (res.data.alreadyRevealed) {
+            // Show existing child immediately
+            setTimeout(() => {
+                navigate("/child-profile");
+            }, 2000);
+            } else {
+            // New child - show full animation
+            setTimeout(() => {
+                navigate("/child-profile");
+            }, 3500);
+            }
+        } catch (error) {
+            console.error('Error revealing child:', error);
+            
+            if (error.response?.status === 401) {
+                navigate('/login');
+                return;
+            }
+            
+            alert('Failed to reveal child. Please try again.');
+            setDrawStarted(false);
+            setShowModal(false);
+        }
+    };
 
   const finalIndex = selectedIndex !== null ? selectedIndex + names.length : 0;
   const translateY = -finalIndex * ITEM_HEIGHT;
