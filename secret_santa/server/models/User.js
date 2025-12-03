@@ -47,10 +47,6 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpires: {
     type: Date
   },
-  chatHistory: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
-  }]
 }, { timestamps: true });
 
 
@@ -65,12 +61,6 @@ userSchema.pre('save', async function (next) {
 // ✅ Compare input password with hashed one
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
-};
-
-// 💬 Add a message to chat history
-userSchema.methods.addToChatHistory = function(messageId) {
-  this.chatHistory.push(messageId);
-  return this.save();
 };
 
 const User = mongoose.model('User', userSchema);
