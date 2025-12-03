@@ -1,37 +1,83 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 
-// AES encryption settings
+// AES-256-CBC + HMAC-SHA256 (Encrypt-then-MAC)
 const ALGORITHM = 'aes-256-cbc';
-const SECRET_KEY = (process.env.CHAT_SECRET_KEY || 'your-32-char-secret-key-here').padEnd(32, '0'); // Ensure 32-byte key
+const HMAC_ALGORITHM = 'sha256';
 
-// Helper: Encrypt text
+// Get keys from environment (32 bytes for AES-256)
+const SECRET_KEY = process.env.CHAT_SECRET_KEY 
+  ? Buffer.from(process.env.CHAT_SECRET_KEY, 'hex')
+  : Buffer.from('your-32-char-secret-key-here-12345'.padEnd(64, '0'), 'hex');
+
+const HMAC_KEY = process.env.CHAT_HMAC_KEY
+  ? Buffer.from(process.env.CHAT_HMAC_KEY, 'hex')
+  : Buffer.from('your-32-char-hmac-key-here-123456'.padEnd(64, '0'), 'hex');
+
+// Encrypt text, then add HMAC for integrity
 function encryptText(text) {
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(SECRET_KEY), iv);
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return { encryptedText: encrypted, iv: iv.toString('hex') };
+  try {
+    // 1. Generate random IV (Initialization Vector)
+    const iv = crypto.randomBytes(16);
+
+    // 2. Encrypt the message
+    const cipher = crypto.createCipheriv(ALGORITHM, SECRET_KEY, iv);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+
+    // 3. Create HMAC of (IV + Encrypted Text) for integrity
+    const hmac = crypto.createHmac(HMAC_ALGORITHM, HMAC_KEY);
+    hmac.update(iv.toString('hex') + encrypted);
+    const tag = hmac.digest('hex');
+
+    return {
+      encryptedText: encrypted,
+      iv: iv.toString('hex'),
+      tag  // HMAC tag for authentication
+    };
+  } catch (error) {
+    console.error('Encryption error:', error);
+    throw new Error('Failed to encrypt message');
+  }
 }
 
-// Helper: Decrypt text
-function decryptText(encryptedText, iv) {
-  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(SECRET_KEY), Buffer.from(iv, 'hex'));
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+// Verify HMAC first, then decrypt
+function decryptText(encryptedText, iv, tag) {
+  try {
+    // 1. Verify HMAC tag first (prevents tampering)
+    const hmac = crypto.createHmac(HMAC_ALGORITHM, HMAC_KEY);
+    hmac.update(iv + encryptedText);
+    const expectedTag = hmac.digest('hex');
+
+    // Constant-time comparison to prevent timing attacks
+    if (!crypto.timingSafeEqual(Buffer.from(tag, 'hex'), Buffer.from(expectedTag, 'hex'))) {
+      throw new Error('Message authentication failed - possible tampering');
+    }
+
+    // 2. Decrypt only if HMAC is valid
+    const decipher = crypto.createDecipheriv(ALGORITHM, SECRET_KEY, Buffer.from(iv, 'hex'));
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+
+    return decrypted;
+  } catch (error) {
+    console.error('Decryption error:', error);
+    return '[Message could not be decrypted - integrity check failed]';
+  }
 }
 
 const MessageSchema = new mongoose.Schema({
-  chatRoom: {
+  roomId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ChatRoom',
-    required: true
+    required: true,
+    index: true  // Index for faster queries
   },
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true  // Index for faster queries
   },
   encryptedText: {
     type: String,
@@ -41,13 +87,21 @@ const MessageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  sentAt: {
+  tag: {  // HMAC tag for message authentication
+    type: String,
+    required: true
+  },
+  createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true  // Index for sorting
   }
 });
 
-// Static methods for encryption/decryption
+// Compound index for efficient room message queries
+MessageSchema.index({ roomId: 1, createdAt: 1 });
+
+// Static methods
 MessageSchema.statics.encryptText = encryptText;
 MessageSchema.statics.decryptText = decryptText;
 

@@ -108,59 +108,44 @@ router.get('/:roomId', protect, async (req, res) => {
 router.get('/:roomId/messages', protect, async (req, res) => {
   try {
     const room = await ChatRoom.findById(req.params.roomId);
-    if (!room) return res.status(404).json({ error: 'Room not found' });
 
-    // Find messages and populate sender
-    const messages = await Message.find({ chatRoom: req.params.roomId })
-      .sort({ sentAt: 1 })
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const isParticipant = room.participants.some(
+      p => p.toString() === req.user.id
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'You are not a participant in this room' });
+    }
+
+    const messages = await Message.find({ roomId: req.params.roomId })
+      .populate('sender', 'name username profilePic')
+      .sort({ createdAt: 1 })
       .lean();
 
-    const User = require('../models/User'); // Make sure User model is imported
-
-    const decryptedMessages = await Promise.all(messages.map(async msg => {
-      let displaySender = msg.sender;
-      let senderId = null;
-
-      // Check if sender is an ObjectId (user reference)
-      if (mongoose.Types.ObjectId.isValid(msg.sender)) {
-        senderId = msg.sender;
-        // Fetch the actual username from the database
-        const user = await User.findById(msg.sender);
-        displaySender = user ? user.username : msg.sender; // Fallback to ID if user not found
-      } else if (room.anonymousMode) {
-        // Already an anonymous name (string)
-        displaySender = msg.sender;
-      }
-
-      // Decrypt the message text
-      let decryptedText;
+    // Decrypt all messages (with HMAC verification)
+    const decryptedMessages = messages.map(msg => {
       try {
-        decryptedText = Message.decryptText(msg.encryptedText, msg.iv);
-      } catch (err) {
-        console.error('Decryption error:', err);
-        decryptedText = '[Message could not be decrypted]';
+        return {
+          ...msg,
+          text: Message.decryptText(msg.encryptedText, msg.iv, msg.tag)
+        };
+      } catch (error) {
+        console.error('Failed to decrypt message:', msg._id, error);
+        return {
+          ...msg,
+          text: '[Message could not be decrypted]'
+        };
       }
-
-      return {
-        _id: msg._id,
-        sender: displaySender, // Now contains username instead of ID
-        senderId: senderId,     // Contains the user's ObjectId for comparison
-        text: decryptedText,
-        sentAt: msg.sentAt
-      };
-    }));
-
-    res.json({ 
-      success: true, 
-      messages: decryptedMessages, 
-      anonymousMode: room.anonymousMode 
     });
+
+    res.json({ success: true, messages: decryptedMessages });
   } catch (err) {
-    console.error('Error in GET /:roomId/messages:', err);
-    res.status(500).json({ 
-      error: 'Error retrieving messages', 
-      details: err.message 
-    });
+    console.error('Error fetching messages:', err);
+    res.status(500).json({ error: 'Error fetching messages' });
   }
 });
 
@@ -168,48 +153,52 @@ router.get('/:roomId/messages', protect, async (req, res) => {
 router.post('/:roomId/message', protect, async (req, res) => {
   try {
     const { text } = req.body;
-    if (!text) {
-      return res.status(400).json({ error: 'Text is required' });
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Message text is required' });
     }
 
-    // Use authenticated user ID (from JWT token)
-    const userId = req.user.id;
-
     const room = await ChatRoom.findById(req.params.roomId);
-    if (!room) return res.status(404).json({ error: 'Room not found' });
 
-    // Check if user is a participant
-    const isParticipant = room.participants.some(p => p._id.toString() === userId);
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    // Check if user is participant
+    const isParticipant = room.participants.some(
+      p => p.toString() === req.user.id
+    );
+
     if (!isParticipant) {
       return res.status(403).json({ error: 'You are not a participant in this room' });
     }
 
-    // Determine sender name (anonymous or real)
-    let senderName = userId;
-    if (room.anonymousMode) {
-      senderName = generateAnonymousName(room, userId);
-      await room.save();
-    }
-
-    const { encryptedText, iv } = Message.encryptText(text); // Static method assumed in model
+    // Encrypt message with HMAC
+    const { encryptedText, iv, tag } = Message.encryptText(text.trim());
 
     const message = await Message.create({
-      chatRoom: req.params.roomId,
-      sender: senderName,
+      roomId: req.params.roomId,
+      sender: req.user.id,
       encryptedText,
       iv,
-      sentAt: new Date()
+      tag  // Store HMAC tag
     });
 
-    await ChatRoom.findByIdAndUpdate(
-      req.params.roomId,
-      { $push: { messages: message._id } },
-      { new: true }
+    // Populate sender info
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'name username profilePic')
+      .lean();
+
+    // Decrypt for response (with HMAC verification)
+    populatedMessage.text = Message.decryptText(
+      populatedMessage.encryptedText,
+      populatedMessage.iv,
+      populatedMessage.tag
     );
 
-    res.status(201).json({ success: true, message });
+    res.json({ success: true, message: populatedMessage });
   } catch (err) {
-    console.error(err);
+    console.error('Error sending message:', err);
     res.status(500).json({ error: 'Error sending message', details: err.message });
   }
 });

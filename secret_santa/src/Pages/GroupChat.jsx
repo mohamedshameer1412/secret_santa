@@ -148,13 +148,26 @@ const GroupChat = () => {
         if (!user) return [];
         
         return rawMessages.map(msg => {
-            const isCurrentUser = msg.senderId === user.id || msg.sender === user.username;
+            // Extract sender ID properly
+            const senderId = msg.sender?._id?.toString() || msg.sender?.toString();
+            const userId = user.id?.toString() || user._id?.toString();
+            
+            // Compare as strings to avoid ObjectId vs string mismatch
+            const isCurrentUser = senderId === userId;
+            
+            const senderName = msg.sender?.name || msg.sender?.username || 'Unknown User';
             
             return {
-                from: isCurrentUser ? (user.username || 'You') : msg.sender,
+                from: isCurrentUser ? (user.username || user.name || 'You') : senderName,
                 content: msg.text,
-                time: new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                img: isCurrentUser ? '/assets/santa2.png' : '/assets/santa1.png'
+                time: new Date(msg.createdAt).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                }),
+                img: isCurrentUser 
+                    ? (user.profilePic || '/assets/santa2.png') 
+                    : (msg.sender?.profilePic || '/assets/santa1.png'),
+                isCurrentUser
             };
         });
     }, [rawMessages, user]);
@@ -343,7 +356,8 @@ const GroupChat = () => {
                         <div className=" flex-grow-1 d-flex flex-column justify-content-between animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)' }}>
                             <div className="chat-scroll flex-grow-1 overflow-auto px-3 py-2" style={{ maxHeight: 'calc(100vh - 240px)' }}>
                                 {messages.map((msg, index) => {
-                                    const isUser = msg.from === user?.username || msg.from === 'You';
+                                    const isUser = msg.isCurrentUser;
+                                    
                                     return (
                                         <div
                                             key={index}
@@ -368,7 +382,9 @@ const GroupChat = () => {
                                             >
                                                 <div className="d-flex justify-content-between align-items-center mb-1">
                                                     <small className="fw-bold">{msg.from}</small>
-                                                    <small className="ms-2" style={{ color: isUser ? '#fff' : '#1e7e34', fontSize: '0.75rem' }}>{msg.time}</small>
+                                                    <small className="ms-2" style={{ color: isUser ? '#fff' : '#1e7e34', fontSize: '0.75rem' }}>
+                                                        {msg.time}
+                                                    </small>
                                                 </div>
                                                 <div style={{ whiteSpace: 'pre-line' }}>{msg.content}</div>
                                             </div>
