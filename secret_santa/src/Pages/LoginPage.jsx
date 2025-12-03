@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import './LoginPage.css';
 
@@ -10,8 +10,28 @@ const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [verificationMessage , setVerificationMessage] = useState('');
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const verified = params.get('verified');
+        
+        if (verified === 'success') {
+            setVerificationMessage('success');
+            // Clear query params from URL
+            setTimeout(() => {
+                navigate('/login', { replace: true });
+            }, 100);
+        } else if (verified === 'error') {
+            setVerificationMessage('error');
+            setTimeout(() => {
+                navigate('/login', { replace: true });
+            }, 100);
+        }
+    }, [location, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -53,6 +73,18 @@ const LoginPage = () => {
                     <p className="text-muted mb-4">Join the holiday fun and surprise your friend with a gift!</p>
 
                     <form onSubmit={handleSubmit}>
+                        {/* ✅ Verification Message */}
+                        {verificationMessage && (
+                            <div 
+                                className={`alert ${verificationMessage === 'success' ? 'alert-success' : 'alert-danger'} d-flex align-items-center`} 
+                                role="alert"
+                            >
+                                <i className={`fa-solid ${verificationMessage === 'success' ? 'fa-circle-check' : 'fa-circle-xmark'} me-2`}></i>
+                                {verificationMessage === 'success' 
+                                    ? 'Email verified successfully! You can now log in.' 
+                                    : 'Verification failed. Link may be invalid or expired.'}
+                            </div>
+                        )}
                         {error && (
                             <div className="alert alert-danger" role="alert">
                                 {error}

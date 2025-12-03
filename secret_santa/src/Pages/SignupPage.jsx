@@ -24,14 +24,24 @@ const SignupPage = () => {
         setIsLoading(true);
         try {
             console.log("Submitting registration with:", { fullName, email }); // Log what we're sending
-            const result = await authService.register(fullName, email, password);
+            const registrationData = {
+                name: fullName,
+                username: username,
+                email: email,
+                password: password
+            };
+            
+            console.log("Submitting registration with:", registrationData);
+            
+            const result = await authService.register(registrationData);
             console.log("Registration successful:", result);
-            alert('Registration successful! You can now log in.');
+            
+            alert('Registration successful! Please check your email to verify your account.');
             navigate('/login');
         } catch (err) {
-            console.error("Registration failed:", err); // More detailed error logging
-            console.error("Error object:", JSON.stringify(err, null, 2));
-            alert(`Registration failed: ${err.message || 'Unknown error'}`);
+            console.error("Registration failed:", err.response?.data || err.message);
+            const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Registration failed. Please try again.';
+            alert(errorMessage);
         } finally {
             setIsLoading(false);
         }

@@ -24,16 +24,25 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Don't redirect for auth check requests
-    const isAuthCheck = error.config.url.includes('/auth/me');
+    // Don't redirect for these endpoints
+    const excludedUrls = [
+      '/auth/me',
+      '/auth/verify',
+      '/auth/verify-email',
+      '/auth/reset-password'
+    ];
     
-    if (error.response?.status === 401 && !isAuthCheck) {
-      localStorage.removeItem('token'); // Clear invalid token
+    const isExcluded = excludedUrls.some(url => error.config.url.includes(url));
+    
+    if (error.response?.status === 401 && !isExcluded) {
+      localStorage.removeItem('token');
       window.location.href = '/login';
     }
+    
     return Promise.reject(error);
   }
 );
@@ -55,20 +64,16 @@ const authService = {
     }
   },
 
-  // Register user
-  register: async (fullName, email, password) => {
-    try {
-        const response = await api.post('/auth/register', { 
-        name: fullName,
-        email, 
-        password 
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Registration error:", error);
-        throw error.response?.data || { message: 'Failed to register' };
-    }
-  },
+    // Register user
+    register: async (userData) => {
+        try {
+            const response = await api.post('/auth/register', userData);
+            return response.data;
+        } catch (error) {
+            console.error("Registration error:", error);
+            throw error.response?.data || { message: 'Failed to register' };
+        }
+    },
 
   // Logout user - call server to clear cookie
   logout: async () => {

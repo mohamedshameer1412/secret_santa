@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ForgotPasswordPage from './Pages/ForgotPasswordPage';
 import LoginPage from './Pages/LoginPage';
 import ResetPasswordPage from './Pages/ResetPasswordPage';
-import SignupPage from './Pages/SignUpPage';
+import SignupPage from './Pages/SignupPage';
 import GroupChat from './Pages/GroupChat';
 import Dashboard from './Pages/Dashboard';
 import VillagePeople from './Pages/VillagePeople';

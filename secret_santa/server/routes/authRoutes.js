@@ -1,86 +1,55 @@
 const express = require('express');
-const { body, param, validationResult } = require('express-validator');
 const router = express.Router();
-
-const {
-  register,
-  login,
-  verifyEmail,
-  forgotPassword,
-  resetPassword,
-  logout,
-  getCurrentUser
-} = require('../controllers/authController');
-
+const authController = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
+const validate = require('../middleware/validate'); // ✅ Use centralized validator
 
-// 📌 Middleware to handle validation results
-const validate = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, errors: errors.array() });
-  }
-  next();
-};
+// Import validation schemas
+const {
+  registerValidation,
+  loginValidation,
+  verifyEmailValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation
+} = require('../validators/authValidators');
 
-// ✅ Register route with validations
-router.post(
-  '/register',
-  [
-    body('name').trim().not().isEmpty().withMessage('Name is required'),
-    body('email').isEmail().normalizeEmail().withMessage('Please include a valid email'),
-    body('password')
-      .isLength({ min: 6 })
-      .withMessage('Password must be at least 6 characters long')
-  ],
-  validate,
-  register
-);
+// ======================== PUBLIC ROUTES ========================
 
-// ✅ Login route with validations
-router.post(
-  '/login',
-  [
-    body('email').isEmail().withMessage('Please include a valid email'),
-    body('password').exists().withMessage('Password is required')
-  ],
-  validate,
-  login
-);
+// @route   POST /api/auth/register
+// @desc    Register new user
+// @access  Public
+router.post('/register', registerValidation, validate, authController.register);
 
-// ✅ Email verification
-router.get(
-  '/verify/:token',
-  [param('token').isLength({ min: 40, max: 40 }).withMessage('Invalid verification token')],
-  validate,
-  verifyEmail
-);
+// @route   POST /api/auth/login
+// @desc    Login user
+// @access  Public
+router.post('/login', loginValidation, validate, authController.login);
 
-// ✅ Forgot password
-router.post(
-  '/forgot-password',
-  [body('email').isEmail().withMessage('Please include a valid email')],
-  validate,
-  forgotPassword
-);
+// @route   GET /api/auth/verify-email/:token
+// @desc    Verify email address
+// @access  Public
+router.get('/verify-email/:token', verifyEmailValidation, validate, authController.verifyEmail);
 
-// ✅ Reset password
-router.post(
-  '/reset-password/:token',
-  [
-    param('token').isLength({ min: 40, max: 40 }).withMessage('Invalid reset token'),
-    body('password')
-      .isLength({ min: 6 })
-      .withMessage('Password must be at least 6 characters long')
-  ],
-  validate,
-  resetPassword
-);
+// @route   POST /api/auth/forgot-password
+// @desc    Send password reset email
+// @access  Public
+router.post('/forgot-password', forgotPasswordValidation, validate, authController.forgotPassword);
 
-// ✅ Logout route (protected)
-router.get('/logout', protect, logout);
+// @route   POST /api/auth/reset-password/:token
+// @desc    Reset password with token
+// @access  Public
+router.post('/reset-password/:token', resetPasswordValidation, validate, authController.resetPassword);
 
-// ✅ Get logged-in user profile (protected)
-router.get('/me', protect, getCurrentUser);
+// ======================== PROTECTED ROUTES ========================
+
+// @route   GET /api/auth/me
+// @desc    Get current user
+// @access  Private
+router.get('/me', protect, authController.getCurrentUser);
+
+// @route   POST /api/auth/logout
+// @desc    Logout user
+// @access  Private
+router.post('/logout', protect, authController.logout);
 
 module.exports = router;
