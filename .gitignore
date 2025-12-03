@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+public/avatars/
+!public/avatars/.gitkeep
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
