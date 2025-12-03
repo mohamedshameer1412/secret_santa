@@ -1,0 +1,277 @@
+
+/* Backdrop */
+.wishlist-quick-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(30, 15, 10, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 9998;
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Modal Container */
+.wishlist-quick-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  perspective: 1000px;
+}
+
+/* Modal Content - The Scroll */
+.wishlist-quick-content {
+  background: #fdf5e6; /* Parchment color */
+  background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png');
+  border: 2px solid #d2b48c;
+  border-radius: 8px;
+  padding: 2.5rem 2rem;
+  max-width: 600px;
+  width: 100%;
+  max-height: 85vh;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 220, 150, 0.2);
+  position: relative;
+  font-family: 'Poppins', sans-serif;
+  color: #5a4a3a;
+  animation: unroll 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+  transform-origin: top center;
+}
+
+/* Wax Seal Close Button */
+.wishlist-quick-close {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: #a52a2a; /* Deep red for wax */
+  border: 3px solid #8b0000;
+  color: #ffebcd;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 10;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.wishlist-quick-close:hover {
+  background: #c83c3c;
+  transform: scale(1.1) rotate(15deg);
+}
+
+/* Header Section */
+.modal-header-section {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #d2b48c;
+}
+
+.modal-title {
+  font-family: 'Cedarville Cursive', cursive;
+  font-size: 3rem;
+  font-weight: 700;
+  color: #8b4513;
+  margin-bottom: 0;
+  line-height: 1;
+}
+
+.modal-subtitle {
+  color: #8b5a2b;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+/* Wishlist Items Container */
+.wishlist-items-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  margin: 0 -0.5rem;
+}
+
+/* Wishlist Preview Item - Polaroid Style */
+.wishlist-preview-item {
+  background: #fffaf0;
+  border: 1px solid #eee5d7;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  animation: fadeInItem 0.5s ease-out var(--delay, 0s) backwards;
+}
+
+.wishlist-preview-item:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  z-index: 5;
+  position: relative;
+}
+
+/* Item Image */
+.item-image {
+  position: relative;
+  flex-shrink: 0;
+  background: white;
+  padding: 5px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.item-image img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  display: block;
+}
+
+.important-badge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  background: #ffd700;
+  color: #4a3f2a;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 6px rgba(255, 215, 0, 0.5);
+  transform: rotate(-15deg);
+}
+
+/* Item Details */
+.item-title {
+  color: #6b4f3a;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.item-description {
+  color: #7d6b5a;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.item-link {
+  color: #a52a2a;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.item-link:hover {
+  color: #c83c3c;
+  text-decoration: underline;
+}
+
+/* Empty & Loading States */
+.empty-state, .loading-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #8b5a2b;
+}
+
+.btn-add-wishlist {
+  background: #8b4513;
+  color: #fdf5e6;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 25px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-add-wishlist:hover {
+  background: #a0522d;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(139, 69, 19, 0.3);
+}
+
+/* Footer Actions */
+.modal-footer-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 1.5rem;
+  border-top: 2px solid #d2b48c;
+  margin-top: 1.5rem;
+}
+
+.btn-manage {
+  background: #a52a2a;
+  color: #fff;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 25px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(165, 42, 42, 0.3);
+}
+
+.btn-manage:hover {
+  background: #c83c3c;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(165, 42, 42, 0.4);
+}
+
+/* Custom Scrollbar */
+.wishlist-items-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.wishlist-items-container::-webkit-scrollbar-track {
+  background: rgba(210, 180, 140, 0.2);
+  border-radius: 10px;
+}
+
+.wishlist-items-container::-webkit-scrollbar-thumb {
+  background: #c8a064;
+  border-radius: 10px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes unroll {
+  from {
+    opacity: 0;
+    transform: rotateX(-90deg) translateY(-50%);
+  }
+  to {
+    opacity: 1;
+    transform: rotateX(0deg) translateY(0);
+  }
+}
+
+@keyframes fadeInItem {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

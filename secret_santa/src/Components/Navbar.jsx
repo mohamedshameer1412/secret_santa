@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import ProfileModal from './ProfileModal';
 import RoomSelectorModal from './RoomSelectorModal';
 import RoomSettingsModal from './RoomSettingsModal';
+import WishlistQuickViewModal from './WishlistQuickViewModal';
 
 const Navbar = ({ toggleSidebar }) => {
     const { user, logout } = useAuth();
@@ -12,6 +13,7 @@ const Navbar = ({ toggleSidebar }) => {
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isRoomSelectorOpen, setIsRoomSelectorOpen] = useState(false);
     const [isRoomSettingsModalOpen, setIsRoomSettingsModalOpen] = useState(false);
+    const [isWishlistModalOpen, setIsWishlistModalOpen] = useState(false);
     const [selectedRoomId, setSelectedRoomId] = useState(null);
     const dropdownRef = useRef(null);
 
@@ -41,6 +43,11 @@ const Navbar = ({ toggleSidebar }) => {
     const handleRoomSelect = (roomId) => {
         setSelectedRoomId(roomId);
         setIsRoomSettingsModalOpen(true);
+    };
+
+    const handleWishlistClick = () => {
+        setIsWishlistModalOpen(true);
+        setDropdownOpen(false);
     };
 
     // Handle logout
@@ -137,9 +144,13 @@ const Navbar = ({ toggleSidebar }) => {
                             </li>
 
                             <li>
-                                <a className="dropdown-item" href="#wishlist">
-                                    <i className="fas fa-crown me-2"></i> Wishlist
-                                </a>
+                                <button 
+                                    className="dropdown-item" 
+                                    onClick={handleWishlistClick}
+                                    style={{ cursor: 'pointer', background: 'none', border: 'none', width: '100%', textAlign: 'left', padding: '0.5rem 1rem' }}
+                                >
+                                    <i className="fas fa-gift me-2"></i> Wishlist
+                                </button>
                             </li>
 
                             <li>
@@ -185,6 +196,12 @@ const Navbar = ({ toggleSidebar }) => {
                 isOpen={isRoomSettingsModalOpen}
                 onClose={() => setIsRoomSettingsModalOpen(false)}
                 roomId={selectedRoomId}
+            />
+
+            {/* Wishlist Quick View Modal */}
+            <WishlistQuickViewModal
+                isOpen={isWishlistModalOpen}
+                onClose={() => setIsWishlistModalOpen(false)}
             />
         </>
     );
