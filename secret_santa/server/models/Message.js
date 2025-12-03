@@ -91,6 +91,49 @@ const MessageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // Reactions from users (anonymous names used)
+  reactions: [{
+    emoji: { type: String, required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    anonymousName: { type: String },
+    createdAt: { type: Date, default: Date.now }
+  }],
+  // File/image attachment (encrypted)
+  attachment: {
+    type: {
+      encryptedUrl: String,  // Encrypted file path/URL
+      iv: String,
+      tag: String,
+      fileType: String,  // image, video, document, etc.
+      fileName: String,  // Original filename (encrypted)
+      fileSize: Number
+    },
+    default: null
+  },
+  // Edit history
+  editHistory: [{
+    encryptedText: String,
+    iv: String,
+    tag: String,
+    editedAt: { type: Date, default: Date.now }
+  }],
+  isEdited: {
+    type: Boolean,
+    default: false
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date
+  },
+  // Delivery status
+  status: {
+    type: String,
+    enum: ['sending', 'sent', 'delivered', 'failed'],
+    default: 'sent'
+  },
   createdAt: {
     type: Date,
     default: Date.now,

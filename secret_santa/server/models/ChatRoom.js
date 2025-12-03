@@ -23,7 +23,7 @@ const roomSchema = new mongoose.Schema({
   },
   anonymousMode: {
     type: Boolean,
-    default: false
+    default: true  // Default to anonymous for privacy
   },
   anonymousNames: {
     type: Map,

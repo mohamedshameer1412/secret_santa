@@ -4,11 +4,42 @@ import Navbar from '../Components/Navbar';
 import Sidebar from '../Components/Sidebar';
 import Picker from 'emoji-picker-react';
 import 'animate.css';
+import './GroupChat.css';
 import axios from 'axios';
 import { useAuth } from '../context/useAuth';
 import confetti from 'canvas-confetti';
+import Swal from 'sweetalert2';
 
 const API_URL = 'http://localhost:5000/api/chat';
+
+// Complete WhatsApp-style reaction emojis (all categories)
+const reactionEmojis = [
+    // Smileys & Emotion
+    '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇',
+    '🥰', '😍', '🤩', '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪',
+    '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒',
+    '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮',
+    '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕',
+    '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥',
+    '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠',
+    '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖',
+    
+    // Hand gestures
+    '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙',
+    '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏',
+    '🙌', '👐', '🤲', '🤝', '🙏',
+    
+    // Popular symbols & hearts
+    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹',
+    '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟',
+    
+    // Common reactions
+    '🔥', '⭐', '✨', '💫', '💥', '💯', '✔️', '✅', '❌', '❗', '❓', '💢',
+    '💤', '💨', '🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '🌟'
+];
+
+// Quick reactions shown in context menu (most popular WhatsApp reactions - 3 to fit with plus button)
+const quickReactions = ['❤️', '😂', '👍'];
 
 const getPrivateChatName = (roomData, userId) => {
     if (!roomData.isPrivate || !roomData.participants) return roomData.name;
@@ -38,10 +69,20 @@ const GroupChat = () => {
     const [gifQuery, setGifQuery] = useState('');
     const [room, setRoom] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [sendingMessage, setSendingMessage] = useState(false);
+    const [uploadingFile, setUploadingFile] = useState(false);
+    const [editingMessageId, setEditingMessageId] = useState(null);
+    const [showReactionPicker, setShowReactionPicker] = useState(null);
+    const [selectedMessageId, setSelectedMessageId] = useState(null);
+    const [showMessageMenu, setShowMessageMenu] = useState(null);
+    const [messageMenuPosition, setMessageMenuPosition] = useState({ x: 0, y: 0 });
+    const [showMessageInfo, setShowMessageInfo] = useState(null);
 
     const chatEndRef = useRef(null);
     const inputRef = useRef(null);
     const typingTimeoutRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const longPressTimer = useRef(null);
 
     useEffect(() => {
         const fetchUserRooms = async () => {
@@ -155,19 +196,24 @@ const GroupChat = () => {
             // Compare as strings to avoid ObjectId vs string mismatch
             const isCurrentUser = senderId === userId;
             
-            const senderName = msg.sender?.name || msg.sender?.username || 'Unknown User';
+            // Use anonymous name if available (anonymous mode)
+            const displayName = msg.anonymousName || msg.sender?.name || msg.sender?.username || 'Anonymous';
             
             return {
-                from: isCurrentUser ? (user.username || user.name || 'You') : senderName,
+                _id: msg._id,
+                from: displayName,
                 content: msg.text,
                 time: new Date(msg.createdAt).toLocaleTimeString([], { 
                     hour: '2-digit', 
                     minute: '2-digit' 
                 }),
-                img: isCurrentUser 
-                    ? (user.profilePic || '/assets/santa2.png') 
-                    : (msg.sender?.profilePic || '/assets/santa1.png'),
-                isCurrentUser
+                img: '/assets/santa2.png', // Use same avatar for all (anonymous)
+                isCurrentUser,
+                isEdited: msg.isEdited,
+                isDeleted: msg.isDeleted,
+                reactions: msg.reactions || [],
+                attachment: msg.attachment,
+                status: msg.status || 'sent'
             };
         });
     }, [rawMessages, user]);
@@ -212,17 +258,37 @@ const GroupChat = () => {
     const handleSend = async () => {
         if (message.trim()) {
             try {
+                setSendingMessage(true);
                 const token = localStorage.getItem('token');
                 if (!token) {
                     navigate('/login');
                     return;
                 }
                 
-                await axios.post(
-                    `${API_URL}/${roomId}/message`,
-                    { text: message },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
+                if (editingMessageId) {
+                    // Edit existing message
+                    await axios.put(
+                        `${API_URL}/${roomId}/message/${editingMessageId}`,
+                        { text: message },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    setEditingMessageId(null);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Message updated!',
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                } else {
+                    // Send new message
+                    await axios.post(
+                        `${API_URL}/${roomId}/message`,
+                        { text: message },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                }
                 
                 setUserTyping(false);
                 setMessage('');
@@ -234,11 +300,305 @@ const GroupChat = () => {
                 if (error.response?.status === 401) {
                     navigate('/login');
                 } else {
-                    alert('Failed to send message. Please try again.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Failed to send message',
+                        text: error.response?.data?.error || 'Please try again.',
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
                 }
+            } finally {
+                setSendingMessage(false);
             }
         }
     };
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Check file size (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            Swal.fire({
+                icon: 'error',
+                title: 'File too large',
+                text: 'Maximum file size is 10MB',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+            return;
+        }
+
+        try {
+            setUploadingFile(true);
+            const token = localStorage.getItem('token');
+            
+            console.log('Upload - Token:', token ? 'exists' : 'missing');
+            console.log('Upload - RoomId:', roomId);
+            console.log('Upload - API URL:', `${API_URL}/${roomId}/upload`);
+            
+            if (!token) {
+                console.error('No token found');
+                navigate('/login');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('text', `Shared a file: ${file.name}`);
+
+            const response = await axios.post(
+                `${API_URL}/${roomId}/upload`,
+                formData,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+
+            console.log('Upload success:', response.data);
+
+            Swal.fire({
+                icon: 'success',
+                title: 'File uploaded!',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000
+            });
+
+            fetchMessages();
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            Swal.fire({
+                icon: 'error',
+                title: 'Upload failed',
+                text: error.response?.data?.message || error.response?.data?.error || 'Please try again.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        } finally {
+            setUploadingFile(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleEditMessage = (msg) => {
+        if (msg.isDeleted) return;
+        setMessage(msg.content);
+        setEditingMessageId(msg._id);
+        inputRef.current?.focus();
+    };
+
+    const handleDeleteMessage = async (messageId) => {
+        const result = await Swal.fire({
+            title: 'Delete message?',
+            text: 'This action cannot be undone',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#cc0000',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const token = localStorage.getItem('token');
+                await axios.delete(
+                    `${API_URL}/${roomId}/message/${messageId}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Message deleted',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+
+                fetchMessages();
+            } catch (error) {
+                console.error('Error deleting message:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Delete failed',
+                    text: 'Please try again.',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        }
+    };
+
+    const handleReaction = async (messageId, emoji) => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(
+                `${API_URL}/${roomId}/message/${messageId}/reaction`,
+                { emoji },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            fetchMessages();
+            setShowReactionPicker(null);
+        } catch (error) {
+            console.error('Error adding reaction:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Reaction failed',
+                text: 'Please try again.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    };
+
+    // WhatsApp-style message selection handlers
+    const handleMessageLongPress = (messageId, event) => {
+        event.preventDefault();
+        longPressTimer.current = setTimeout(() => {
+            setSelectedMessageId(messageId);
+            setShowMessageMenu(messageId);
+            
+            // Calculate position to keep menu in viewport
+            const menuWidth = 220;
+            const menuHeight = 400;
+            let x = Math.min(event.clientX, window.innerWidth - menuWidth - 10);
+            let y = Math.min(event.clientY, window.innerHeight - menuHeight - 10);
+            x = Math.max(10, x);
+            y = Math.max(10, y);
+            
+            setMessageMenuPosition({ x, y });
+        }, 500); // 500ms long press
+    };
+
+    const handleMessageTouchStart = (messageId, event) => {
+        const touch = event.touches[0];
+        longPressTimer.current = setTimeout(() => {
+            setSelectedMessageId(messageId);
+            setShowMessageMenu(messageId);
+            
+            // Calculate position to keep menu in viewport
+            const menuWidth = 220;
+            const menuHeight = 400;
+            let x = Math.min(touch.clientX, window.innerWidth - menuWidth - 10);
+            let y = Math.min(touch.clientY, window.innerHeight - menuHeight - 10);
+            x = Math.max(10, x);
+            y = Math.max(10, y);
+            
+            setMessageMenuPosition({ x, y });
+        }, 500);
+    };
+
+    const handleMessageTouchEnd = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+        }
+    };
+
+    const handleMessageClick = (messageId, event) => {
+        // If already selected, show menu on click
+        if (selectedMessageId === messageId) {
+            setShowMessageMenu(messageId);
+            
+            // Calculate position to keep menu in viewport
+            const menuWidth = 220;
+            const menuHeight = 400;
+            let x = Math.min(event.clientX, window.innerWidth - menuWidth - 10);
+            let y = Math.min(event.clientY, window.innerHeight - menuHeight - 10);
+            x = Math.max(10, x);
+            y = Math.max(10, y);
+            
+            setMessageMenuPosition({ x, y });
+        }
+    };
+
+    // Handle double-click/double-tap to show context menu directly
+    const handleMessageDoubleClick = (messageId, event) => {
+        event.preventDefault();
+        setSelectedMessageId(messageId);
+        setShowMessageMenu(messageId);
+        
+        // Calculate position to ensure menu stays within viewport
+        const menuWidth = 220;
+        const menuHeight = 400; // Approximate height
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        let x = event.clientX;
+        let y = event.clientY;
+        
+        // Adjust horizontal position if menu would overflow right
+        if (x + menuWidth > viewportWidth) {
+            x = viewportWidth - menuWidth - 10;
+        }
+        
+        // Adjust vertical position if menu would overflow bottom
+        if (y + menuHeight > viewportHeight) {
+            y = viewportHeight - menuHeight - 10;
+        }
+        
+        // Ensure minimum margins from edges
+        x = Math.max(10, x);
+        y = Math.max(10, y);
+        
+        setMessageMenuPosition({ x, y });
+    };
+
+    const closeMessageMenu = () => {
+        setShowMessageMenu(null);
+        setSelectedMessageId(null);
+    };
+
+    const handleMenuEdit = (msg) => {
+        handleEditMessage(msg);
+        closeMessageMenu();
+    };
+
+    const handleMenuDelete = (messageId) => {
+        handleDeleteMessage(messageId);
+        closeMessageMenu();
+    };
+
+    const handleMenuInfo = (messageId) => {
+        setShowMessageInfo(messageId);
+        closeMessageMenu();
+    };
+
+    const handleMenuReact = (messageId) => {
+        setShowReactionPicker(messageId);
+        closeMessageMenu();
+    };
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (showMessageMenu && !e.target.closest('.message-menu') && !e.target.closest('.message-bubble')) {
+                closeMessageMenu();
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showMessageMenu]);
 
     const handleInputChange = (e) => {
         const newValue = e.target.value;
@@ -317,29 +677,26 @@ const GroupChat = () => {
                     <div className=" d-flex flex-column flex-grow-1 w-100 h-100 mt-3 pt-3 border border-danger-subtle border-4 shadow-sm">
                         <div className="p-3 bg-white border-bottom border-danger-subtle">
                             <h5 className="mb-0 text-danger">
+                                <i className="fa-solid fa-mask me-2"></i>
                                 {room?.isPrivate ? (
                                     <>
-                                        <i className="fa-solid fa-user-circle me-2"></i>
                                         {room.displayName || getPrivateChatName(room)}
                                     </>
                                 ) : (
                                     <>
-                                        <i className="fa-solid fa-users me-2"></i>
                                         {room?.name || 'Group Chat'}
                                     </>
                                 )}
                                 
                                 {/* Badges */}
-                                {room?.participants?.length === 1 && (
-                                    <span className="badge bg-info ms-2">Personal</span>
-                                )}
-                                {room?.anonymousMode && (
-                                    <span className="badge bg-secondary ms-2">Anonymous Mode</span>
-                                )}
+                                <span className="badge bg-dark ms-2">
+                                    <i className="fa-solid fa-user-secret me-1"></i>
+                                    Anonymous Mode
+                                </span>
                                 {room?.isPrivate && (
                                     <span className="badge bg-success ms-2">
                                         <i className="fa-solid fa-lock me-1"></i>
-                                        Private
+                                        Private Chat
                                     </span>
                                 )}
                             </h5>
@@ -348,15 +705,22 @@ const GroupChat = () => {
                             {!room?.isPrivate && room?.participants?.length > 0 && (
                                 <small className="text-muted">
                                     <i className="fa-solid fa-users me-1"></i>
-                                    {room.participants.length} {room.participants.length === 1 ? 'member' : 'members'}
+                                    {room.participants.length} anonymous {room.participants.length === 1 ? 'member' : 'members'}
                                 </small>
                             )}
+                            <div className="mt-1">
+                                <small className="text-muted fst-italic">
+                                    <i className="fa-solid fa-shield-halved me-1"></i>
+                                    All identities protected • Messages encrypted
+                                </small>
+                            </div>
                         </div>
 
                         <div className=" flex-grow-1 d-flex flex-column justify-content-between animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)' }}>
                             <div className="chat-scroll flex-grow-1 overflow-auto px-3 py-2" style={{ maxHeight: 'calc(100vh - 240px)' }}>
                                 {messages.map((msg, index) => {
                                     const isUser = msg.isCurrentUser;
+                                    const isSelected = selectedMessageId === msg._id;
                                     
                                     return (
                                         <div
@@ -371,22 +735,242 @@ const GroupChat = () => {
                                                     style={{ width: '40px', height: '40px', objectFit: 'cover' }}
                                                 />
                                             )}
-                                            <div
-                                                className={`position-relative px-3 py-2 rounded-4 shadow-sm animate__animated animate__fadeInUp`}
-                                                style={{
-                                                    maxWidth: '75%',
-                                                    backgroundColor: isUser ? '#cc0000' : '#ffffff',
-                                                    color: isUser ? '#fff' : '#000',
-                                                    border: isUser ? 'none' : '1px solid #dee2e6',
-                                                }}
-                                            >
-                                                <div className="d-flex justify-content-between align-items-center mb-1">
-                                                    <small className="fw-bold">{msg.from}</small>
-                                                    <small className="ms-2" style={{ color: isUser ? '#fff' : '#1e7e34', fontSize: '0.75rem' }}>
-                                                        {msg.time}
+                                            <div className="position-relative" style={{ maxWidth: '70%' }}>
+                                                {/* User name above message bubble (WhatsApp style) */}
+                                                {!isUser && (
+                                                    <small className="fw-bold text-muted ms-2 mb-1 d-block" style={{ fontSize: '0.75rem' }}>
+                                                        {msg.from}
                                                     </small>
+                                                )}
+                                                
+                                                <div
+                                                    className={`message-bubble px-3 py-2 rounded-3 shadow-sm animate__animated animate__fadeInUp ${isSelected ? 'selected-message' : ''}`}
+                                                    style={{
+                                                        backgroundColor: isSelected 
+                                                            ? (isUser ? '#b30000' : '#f0f0f0')
+                                                            : (isUser ? '#cc0000' : '#ffffff'),
+                                                        color: isUser ? '#fff' : '#000',
+                                                        border: isUser ? 'none' : '1px solid #dee2e6',
+                                                        opacity: msg.isDeleted ? 0.6 : 1,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease',
+                                                        wordBreak: 'break-word'
+                                                    }}
+                                                    onMouseDown={(e) => handleMessageLongPress(msg._id, e)}
+                                                    onMouseUp={handleMessageTouchEnd}
+                                                    onTouchStart={(e) => handleMessageTouchStart(msg._id, e)}
+                                                    onTouchEnd={handleMessageTouchEnd}
+                                                    onClick={(e) => handleMessageClick(msg._id, e)}
+                                                    onDoubleClick={(e) => handleMessageDoubleClick(msg._id, e)}
+                                                >
+                                                    {/* File attachment */}
+                                                    {msg.attachment && !msg.isDeleted && (
+                                                        <div className="mb-2">
+                                                            {(() => {
+                                                                const isImage = msg.attachment.fileType === 'image' || 
+                                                                    msg.attachment.fileName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ||
+                                                                    msg.attachment.originalName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i);
+                                                                
+                                                                return isImage ? (
+                                                                    <img 
+                                                                        src={`http://localhost:5000${msg.attachment.url}`}
+                                                                        alt="attachment"
+                                                                        className="img-fluid rounded shadow-sm"
+                                                                        style={{ maxWidth: '250px', maxHeight: '250px', objectFit: 'cover', cursor: 'pointer' }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            window.open(`http://localhost:5000${msg.attachment.url}`, '_blank');
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <a 
+                                                                        href={`http://localhost:5000${msg.attachment.url}`}
+                                                                        download
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className={`btn btn-sm ${isUser ? 'btn-light' : 'btn-danger'} d-flex align-items-center gap-2`}
+                                                                        style={{ width: 'fit-content' }}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <i className="fa-solid fa-file"></i>
+                                                                        <span className="text-truncate" style={{ maxWidth: '150px' }}>
+                                                                            {msg.attachment.fileName || msg.attachment.originalName || 'File'}
+                                                                        </span>
+                                                                    </a>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Message content with time inline (WhatsApp horizontal style) */}
+                                                    <div className="d-flex align-items-end gap-2">
+                                                        <div style={{ whiteSpace: 'pre-line', flex: 1 }}>
+                                                            {msg.content.startsWith('[GIF:') && msg.content.endsWith(']') ? (
+                                                                <video
+                                                                    src={msg.content.slice(6, -1)}
+                                                                    autoPlay
+                                                                    loop
+                                                                    muted
+                                                                    playsInline
+                                                                    className="rounded"
+                                                                    style={{ maxWidth: '250px', maxHeight: '250px', cursor: 'pointer' }}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        window.open(msg.content.slice(6, -1), '_blank');
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                msg.content
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {/* Time and status inline at bottom-right */}
+                                                        <div className="d-flex align-items-center gap-1 flex-shrink-0" style={{ fontSize: '0.7rem', alignSelf: 'flex-end' }}>
+                                                            {msg.isEdited && !msg.isDeleted && (
+                                                                <small style={{ opacity: 0.7, fontSize: '0.65rem' }}>edited</small>
+                                                            )}
+                                                            <small style={{ color: isUser ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>
+                                                                {msg.time}
+                                                            </small>
+                                                            {msg.status === 'sending' && (
+                                                                <div className="spinner-border spinner-border-sm" role="status" style={{ width: '10px', height: '10px' }}>
+                                                                    <span className="visually-hidden">Sending...</span>
+                                                                </div>
+                                                            )}
+                                                            {msg.status === 'sent' && isUser && (
+                                                                <i className="fa-solid fa-check" style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}></i>
+                                                            )}
+                                                            {msg.status === 'delivered' && isUser && (
+                                                                <i className="fa-solid fa-check-double" style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}></i>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* WhatsApp-style dropdown arrow for selected message */}
+                                                    {isSelected && (
+                                                        <div className="position-absolute top-0 end-0 mt-1 me-1">
+                                                            <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.8rem', color: isUser ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}></i>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div style={{ whiteSpace: 'pre-line' }}>{msg.content}</div>
+
+                                                {/* WhatsApp-style context menu */}
+                                                {showMessageMenu === msg._id && (
+                                                    <div 
+                                                        className="message-menu position-fixed bg-white rounded-3 shadow-lg py-2 z-3"
+                                                        style={{
+                                                            left: `${messageMenuPosition.x}px`,
+                                                            top: `${messageMenuPosition.y}px`,
+                                                            minWidth: '220px',
+                                                            zIndex: 1050,
+                                                            border: '1px solid #dee2e6'
+                                                        }}
+                                                    >
+                                                        {!msg.isDeleted && (
+                                                            <>
+                                                                <button
+                                                                    className="dropdown-item d-flex align-items-center gap-3 px-3 py-2"
+                                                                    onClick={() => handleMenuInfo(msg._id)}
+                                                                >
+                                                                    <i className="fa-solid fa-info-circle text-primary"></i>
+                                                                    <span>Message Info</span>
+                                                                </button>
+                                                                
+                                                                {/* Quick Reactions Section */}
+                                                                <div className="px-3 py-2 border-top border-bottom">
+                                                                    <small className="text-muted d-block mb-2" style={{ fontSize: '0.75rem' }}>Quick Reactions</small>
+                                                                    <div className="d-flex gap-2 justify-content-around align-items-center">
+                                                                        {quickReactions.map(emoji => (
+                                                                            <button
+                                                                                key={emoji}
+                                                                                className="btn btn-sm btn-light border"
+                                                                                onClick={() => {
+                                                                                    handleReaction(msg._id, emoji);
+                                                                                    setShowMessageMenu(null);
+                                                                                    setSelectedMessageId(null);
+                                                                                }}
+                                                                                style={{ 
+                                                                                    fontSize: '1.3rem',
+                                                                                    padding: '6px 10px',
+                                                                                    transition: 'transform 0.2s',
+                                                                                    backgroundColor: 'transparent'
+                                                                                }}
+                                                                                onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
+                                                                                onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                                                                            >
+                                                                                {emoji}
+                                                                            </button>
+                                                                        ))}
+                                                                        
+                                                                        {/* Plus icon for more reactions */}
+                                                                        <button
+                                                                            className="btn btn-sm btn-light border"
+                                                                            onClick={() => handleMenuReact(msg._id)}
+                                                                            style={{ 
+                                                                                fontSize: '1.3rem',
+                                                                                padding: '6px 10px',
+                                                                                transition: 'transform 0.2s',
+                                                                                backgroundColor: 'transparent'
+                                                                            }}
+                                                                            onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
+                                                                            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                                                                            title="More reactions"
+                                                                        >
+                                                                            <i className="fa-solid fa-plus"></i>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                {isUser && (
+                                                                    <>
+                                                                        <div className="dropdown-divider"></div>
+                                                                        <button
+                                                                            className="dropdown-item d-flex align-items-center gap-3 px-3 py-2"
+                                                                            onClick={() => handleMenuEdit(msg)}
+                                                                        >
+                                                                            <i className="fa-solid fa-edit text-success"></i>
+                                                                            <span>Edit</span>
+                                                                        </button>
+                                                                        <button
+                                                                            className="dropdown-item d-flex align-items-center gap-3 px-3 py-2"
+                                                                            onClick={() => handleMenuDelete(msg._id)}
+                                                                        >
+                                                                            <i className="fa-solid fa-trash text-danger"></i>
+                                                                            <span>Delete</span>
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Reactions Display (existing reactions only) */}
+                                                {!msg.isDeleted && msg.reactions && msg.reactions.length > 0 && (
+                                                    <div className="d-flex flex-wrap gap-1 mt-1">
+                                                        {Object.entries(
+                                                            msg.reactions.reduce((acc, r) => {
+                                                                acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                                                return acc;
+                                                            }, {})
+                                                        ).map(([emoji, count]) => (
+                                                            <span
+                                                                key={emoji}
+                                                                className="badge bg-light text-dark d-flex align-items-center gap-1"
+                                                                style={{ fontSize: '0.85rem', cursor: 'pointer', padding: '4px 8px' }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleReaction(msg._id, emoji);
+                                                                }}
+                                                                title={msg.reactions
+                                                                    .filter(r => r.emoji === emoji)
+                                                                    .map(r => r.anonymousName)
+                                                                    .join(', ')}
+                                                            >
+                                                                {emoji} <span className="fw-bold">{count}</span>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             {isUser && (
                                                 <img
@@ -423,9 +1007,232 @@ const GroupChat = () => {
 
                                 <div ref={chatEndRef}></div>
                             </div>
+
+                            {/* WhatsApp-style Message Info Modal */}
+                            {showMessageInfo && (
+                                <div 
+                                    className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                                    style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}
+                                    onClick={() => setShowMessageInfo(null)}
+                                >
+                                    <div 
+                                        className="bg-white rounded-4 shadow-lg p-4"
+                                        style={{ maxWidth: '500px', width: '90%' }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 className="mb-0">
+                                                <i className="fa-solid fa-info-circle text-primary me-2"></i>
+                                                Message Info
+                                            </h5>
+                                            <button 
+                                                className="btn-close"
+                                                onClick={() => setShowMessageInfo(null)}
+                                            ></button>
+                                        </div>
+
+                                        {(() => {
+                                            const msg = messages.find(m => m._id === showMessageInfo);
+                                            if (!msg) return null;
+
+                                            return (
+                                                <div>
+                                                    {/* Message preview */}
+                                                    <div className="bg-light p-3 rounded-3 mb-3">
+                                                        <small className="text-muted d-block mb-1">Message</small>
+                                                        <p className="mb-0" style={{ whiteSpace: 'pre-line' }}>
+                                                            {msg.content}
+                                                        </p>
+                                                        {msg.isEdited && (
+                                                            <small className="text-muted fst-italic">(edited)</small>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Message details */}
+                                                    <div className="mb-3">
+                                                        <div className="d-flex justify-content-between py-2 border-bottom">
+                                                            <span className="text-muted">
+                                                                <i className="fa-solid fa-user me-2"></i>
+                                                                From
+                                                            </span>
+                                                            <strong>{msg.from}</strong>
+                                                        </div>
+                                                        <div className="d-flex justify-content-between py-2 border-bottom">
+                                                            <span className="text-muted">
+                                                                <i className="fa-solid fa-clock me-2"></i>
+                                                                Sent
+                                                            </span>
+                                                            <strong>{msg.time}</strong>
+                                                        </div>
+                                                        <div className="d-flex justify-content-between py-2 border-bottom">
+                                                            <span className="text-muted">
+                                                                <i className="fa-solid fa-shield-halved me-2"></i>
+                                                                Status
+                                                            </span>
+                                                            <span className="badge bg-success">
+                                                                {msg.status === 'delivered' ? 'Delivered' : 'Sent'}
+                                                                {msg.status === 'delivered' && (
+                                                                    <i className="fa-solid fa-check-double ms-1"></i>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        {msg.reactions && msg.reactions.length > 0 && (
+                                                            <div className="py-2 border-bottom">
+                                                                <span className="text-muted d-block mb-2">
+                                                                    <i className="fa-solid fa-face-smile me-2"></i>
+                                                                    Reactions
+                                                                </span>
+                                                                <div className="d-flex flex-wrap gap-2">
+                                                                    {msg.reactions.map((reaction, idx) => (
+                                                                        <span key={idx} className="badge bg-light text-dark">
+                                                                            {reaction.emoji} {reaction.anonymousName}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Read receipts (anonymous) */}
+                                                    <div className="alert alert-info d-flex align-items-center mb-0">
+                                                        <i className="fa-solid fa-eye me-2"></i>
+                                                        <small>
+                                                            Seen by {room?.participants?.length || 0} anonymous member(s)
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Full Reaction Picker Modal (when "All Reactions" is clicked) */}
+                            {showReactionPicker && (
+                                <div 
+                                    className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                                    style={{ 
+                                        backgroundColor: 'rgba(0,0,0,0.5)',
+                                        zIndex: 10000
+                                    }}
+                                    onClick={() => setShowReactionPicker(null)}
+                                >
+                                    <div 
+                                        className="bg-white rounded-4 p-4 shadow-lg"
+                                        style={{ 
+                                            maxWidth: '600px',
+                                            width: '90%',
+                                            maxHeight: '80vh',
+                                            display: 'flex',
+                                            flexDirection: 'column'
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                                            <h5 className="mb-0">
+                                                <i className="fa-solid fa-face-smile text-warning me-2"></i>
+                                                Choose a Reaction
+                                            </h5>
+                                            <button 
+                                                className="btn-close"
+                                                onClick={() => setShowReactionPicker(null)}
+                                            ></button>
+                                        </div>
+                                        
+                                        <div 
+                                            className="p-2"
+                                            style={{ 
+                                                overflowY: 'auto',
+                                                flex: 1,
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(60px, 1fr))',
+                                                gap: '8px',
+                                                justifyItems: 'center'
+                                            }}
+                                        >
+                                            {reactionEmojis.map(emoji => (
+                                                <button
+                                                    key={emoji}
+                                                    className="btn border-0"
+                                                    onClick={() => {
+                                                        handleReaction(showReactionPicker, emoji);
+                                                        setShowReactionPicker(null);
+                                                        setSelectedMessageId(null);
+                                                    }}
+                                                    style={{ 
+                                                        fontSize: '2rem',
+                                                        padding: '12px',
+                                                        width: '60px',
+                                                        height: '60px',
+                                                        transition: 'all 0.2s',
+                                                        backgroundColor: 'transparent',
+                                                        borderRadius: '8px'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.target.style.transform = 'scale(1.3)';
+                                                        e.target.style.backgroundColor = '#f0f0f0';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.target.style.transform = 'scale(1)';
+                                                        e.target.style.backgroundColor = 'transparent';
+                                                    }}
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        
+                                        <div className="pt-3 border-top mt-3">
+                                            <small className="text-muted">
+                                                <i className="fa-solid fa-info-circle me-1"></i>
+                                                {reactionEmojis.length} emojis available
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             
                             <div className="d-flex align-items-end justify-content-between gap-3 p-3 bg-white shadow-sm flex-wrap border-top border-4 border-danger-subtle" style={{ position: 'sticky', bottom: 0, zIndex: 10 }}>
+                                {/* Edit mode indicator */}
+                                {editingMessageId && (
+                                    <div className="w-100 d-flex justify-content-between align-items-center bg-info bg-opacity-10 p-2 rounded mb-2">
+                                        <span className="text-muted">
+                                            <i className="fa-solid fa-edit me-2"></i>
+                                            Editing message...
+                                        </span>
+                                        <button
+                                            className="btn btn-sm btn-close"
+                                            onClick={() => {
+                                                setEditingMessageId(null);
+                                                setMessage('');
+                                            }}
+                                        ></button>
+                                    </div>
+                                )}
+
                                 <div className="d-flex align-items-center gap-2 position-relative">
+                                    {/* File upload button */}
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        className="d-none"
+                                        onChange={handleFileUpload}
+                                        accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+                                    />
+                                    <button
+                                        className="btn btn-light rounded-circle d-flex align-items-center justify-content-center icon-btn"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={uploadingFile}
+                                        aria-label="Upload File"
+                                        title="Upload file or image"
+                                    >
+                                        {uploadingFile ? (
+                                            <div className="spinner-border spinner-border-sm" role="status"></div>
+                                        ) : (
+                                            <i className="fa-solid fa-paperclip fs-5 text-secondary"></i>
+                                        )}
+                                    </button>
+
                                     <button
                                         className="btn btn-light rounded-circle d-flex align-items-center justify-content-center icon-btn"
                                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -515,18 +1322,26 @@ const GroupChat = () => {
                                         ref={inputRef}
                                         rows={1}
                                         className="form-control flex-grow-1 px-3 py-2 rounded-4 shadow-sm"
-                                        placeholder="Type a message..."
+                                        placeholder={editingMessageId ? "Edit your message..." : "Type a message..."}
                                         value={message}
                                         onChange={handleInputChange}
                                         onKeyDown={handleKeyDown}
+                                        disabled={sendingMessage}
                                         style={{ minHeight: '44px', maxHeight: '120px', resize: 'none' }}
                                     ></textarea>
                                     <button
                                         className="btn send-btn icon-btn1"
                                         onClick={handleSend}
-                                        aria-label="Send Message"
+                                        disabled={sendingMessage || !message.trim()}
+                                        aria-label={editingMessageId ? "Update Message" : "Send Message"}
                                     >
-                                        <i className="fa-solid fa-paper-plane"></i>
+                                        {sendingMessage ? (
+                                            <div className="spinner-border spinner-border-sm text-white" role="status"></div>
+                                        ) : editingMessageId ? (
+                                            <i className="fa-solid fa-check"></i>
+                                        ) : (
+                                            <i className="fa-solid fa-paper-plane"></i>
+                                        )}
                                     </button>
                                 </div>
                             </div>
