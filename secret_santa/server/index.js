@@ -75,7 +75,6 @@ const connectDB = async () => {
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/wishlist', require('./routes/wishlistRoutes'));
 app.use('/api/village', require('./routes/villageRoutes'));
