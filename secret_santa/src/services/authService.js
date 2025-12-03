@@ -76,15 +76,17 @@ const authService = {
     },
 
   // Logout user - call server to clear cookie
-  logout: async () => {
-    try {
-      await api.get('/auth/logout');
-      localStorage.removeItem('token'); // Clear token on logout
-      return true;
-    } catch (error) {
-      throw error.response?.data || { message: 'Failed to logout' };
-    }
-  },
+    logout: async () => {
+        try {
+            await api.post('/auth/logout');
+        } catch (error) {
+            // Logout should succeed even if server is down
+            console.warn('Backend logout failed (non-critical):', error.response?.status);
+        } finally {
+            // Clear token locally
+            localStorage.removeItem('token');
+        }
+    },
 
   // Get current user profile
   getCurrentUser: async () => {
