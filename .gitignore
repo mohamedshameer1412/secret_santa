@@ -12,8 +12,8 @@ dist
 dist-ssr
 *.local
 
-public/avatars/
-!public/avatars/.gitkeep
+secret_santa/public/avatars/
+!secret_santa/public/avatars/.gitkeep
 
 # Editor directories and files
 .vscode/*

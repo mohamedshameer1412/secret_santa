@@ -28,7 +28,9 @@ const sendTokenResponse = (user, statusCode, res) => {
       user: {
         id: user._id,
         name: user.name,
+        username: user.username,
         email: user.email,
+        profilePic: user.profilePic,
         role: user.role
       }
     });
@@ -37,18 +39,20 @@ const sendTokenResponse = (user, statusCode, res) => {
 // ======================== REGISTER ========================
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
+    const { name, username, email, password } = req.body;
+    if (!name || !username || !email || !password) {
       return res.status(400).json({ message: 'Please provide name, email, and password' });
     }
 
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
+    let user = await User.findOne({ 
+      $or: [{ email }, { username }] 
+    });
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    if (user) {
+      return res.status(400).json({ 
+        message: user.email === email ? 'Email already exists' : 'Username already taken' 
+      });
+    }
 
     // Create email verification token
     const verificationToken = crypto.randomBytes(20).toString('hex');
@@ -56,8 +60,9 @@ exports.register = async (req, res) => {
 
     user = new User({
       name,
+      username,
       email,
-      password: hashedPassword,
+      password,
       isVerified: false,
       verificationToken,
       verificationExpires
@@ -195,8 +200,7 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
+    user.password = password;
     user.isVerified = true;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;

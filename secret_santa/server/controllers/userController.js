@@ -1,4 +1,4 @@
-// filepath: d:\TryingToStudyThis\Projects\Sample Projects\Secret Santa\secret_santa\secret_santa\server\auth-backend\controllers\userController.js
+
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 

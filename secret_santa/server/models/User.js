@@ -1,5 +1,22 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
+
+// Load avatar metadata from downloaded files (Use node server/generateAvatars.js to create)
+let availableAvatars = [];
+
+try {
+  const avatarsPath = path.join(__dirname, '../../public/avatars/avatars.json');
+  if (fs.existsSync(avatarsPath)) {
+    availableAvatars = JSON.parse(fs.readFileSync(avatarsPath, 'utf8'));
+    console.log(`✅ Loaded ${availableAvatars.length} avatars from local files`);
+  } else {
+    console.warn('⚠️  Avatar files not found. Run: node server/scripts/downloadAvatars.js');
+  }
+} catch (error) {
+  console.error('❌ Error loading avatars:', error.message);
+}
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -26,6 +43,22 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters']
   },
+  profilePic: {
+    type: String,
+    default: function () {
+      // ✅ Only use local avatars, no API fallback
+      if (availableAvatars.length > 0) {
+        const randomAvatar = availableAvatars[Math.floor(Math.random() * availableAvatars.length)];
+        return randomAvatar.path;
+      }
+      // ✅ Empty string - frontend handles placeholder
+      return '';
+    }
+  },
+  avatarStyle: {
+    type: String,
+    default: 'shapes'
+  },
   isVerified: {
     type: Boolean,
     default: false
@@ -35,20 +68,11 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
-  verificationToken: {
-    type: String
-  },
-  verificationExpires: {
-    type: Date
-  },
-  resetPasswordToken: {
-    type: String
-  },
-  resetPasswordExpires: {
-    type: Date
-  },
+  verificationToken: String,
+  verificationExpires: Date,
+  resetPasswordToken: String,
+  resetPasswordExpires: Date
 }, { timestamps: true });
-
 
 // 🔐 Hash password before saving
 userSchema.pre('save', async function (next) {
@@ -58,9 +82,26 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-// ✅ Compare input password with hashed one
+// ✅ Compare password
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// ✅ Static methods for avatar management
+userSchema.statics.getAvailableAvatars = function() {
+  return availableAvatars;
+};
+
+userSchema.statics.getAvatarsByStyle = function(style) {
+  return availableAvatars.filter(avatar => avatar.style === style);
+};
+
+userSchema.statics.getRandomAvatar = function(excludeCurrent = null) {
+  let filtered = availableAvatars;
+  if (excludeCurrent && filtered.length > 1) {
+    filtered = availableAvatars.filter(a => a.path !== excludeCurrent);
+  }
+  return filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : null;
 };
 
 const User = mongoose.model('User', userSchema);
