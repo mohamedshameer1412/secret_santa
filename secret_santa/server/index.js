@@ -79,12 +79,29 @@ app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/wishlist', require('./routes/wishlistRoutes'));
 app.use('/api/village', require('./routes/villageRoutes'));
 app.use('/api/children', require('./routes/childRoutes'));
+app.use('/api/invite', require('./routes/invite'));
+app.use('/api/room', require('./routes/roomRoutes'));
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+// ======================== ERROR HANDLING ========================
+// Import the proper error handler
+const errorHandler = require('./middleware/error');
+
+// 404 handler for undefined routes
+app.use((req, res, next) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`
+  });
 });
+
+// Request logging in development
+if (process.env.NODE_ENV === 'development') {
+  const logger = require('./middleware/logger');
+  app.use(logger);
+}
+
+// Use the centralized error handler
+app.use(errorHandler);
 
 // Start server only after DB connection
 connectDB().then(() => {
