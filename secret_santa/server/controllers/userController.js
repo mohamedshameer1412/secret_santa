@@ -1,119 +1,135 @@
-
 const User = require('../models/User');
-const bcrypt = require('bcryptjs');
+const asyncHandler = require('../utils/asyncHandler');
+const AppError = require('../utils/AppError');
 
-// Get user profile
-exports.getUserProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('-password');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.status(200).json(user);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+// ======================== GET USER PROFILE ========================
+exports.getUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id).select('-password');
+  
+  if (!user) {
+    throw new AppError('User not found', 404);
   }
-};
+  
+  res.status(200).json({
+    success: true,
+    data: user
+  });
+});
 
-// Update user profile
-exports.updateUserProfile = async (req, res) => {
-  try {
-    const { name, email } = req.body;
-    
-    // Build user object
-    const userFields = {};
-    if (name) userFields.name = name;
-    if (email) userFields.email = email;
-
-    let user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Check if email is being changed
-    if (email && email !== user.email) {
-      const emailExists = await User.findOne({ email });
-      if (emailExists) {
-        return res.status(400).json({ message: 'Email already in use' });
-      }
-    }
-
-    // Update user
-    user = await User.findByIdAndUpdate(
-      req.user.id,
-      { $set: userFields },
-      { new: true }
-    ).select('-password');
-
-    res.status(200).json(user);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+// ======================== UPDATE USER PROFILE ========================
+exports.updateUserProfile = asyncHandler(async (req, res) => {
+  const { name, email, username, profilePic } = req.body;
+  
+  let user = await User.findById(req.user.id);
+  
+  if (!user) {
+    throw new AppError('User not found', 404);
   }
-};
 
-// Change password
-exports.changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+  // Check if email is being changed
+  if (email && email !== user.email) {
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
+      throw new AppError('Email already in use', 400);
     }
+  }
 
-    // Check current password
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Current password is incorrect' });
+  // Check if username is being changed
+  if (username && username !== user.username) {
+    const usernameExists = await User.findOne({ username });
+    if (usernameExists) {
+      throw new AppError('Username already in use', 400);
     }
-
-    // Update password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
-    await user.save();
-
-    res.status(200).json({ message: 'Password updated successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
   }
-};
 
-// Delete user account
-exports.deleteUser = async (req, res) => {
-  try {
-    await User.findByIdAndDelete(req.user.id);
-    res.status(200).json({ message: 'User account deleted successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+  // Update fields
+  if (name) user.name = name;
+  if (email) user.email = email;
+  if (username) user.username = username;
+  if (profilePic) user.profilePic = profilePic;
 
-// Admin: Get all users
-exports.getAllUsers = async (req, res) => {
-  try {
-    const users = await User.find().select('-password');
-    res.status(200).json(users);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+  await user.save();
 
-// Admin: Get single user
-exports.getSingleUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select('-password');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+  res.status(200).json({
+    success: true,
+    message: 'Profile updated successfully',
+    data: {
+      id: user._id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      profilePic: user.profilePic
     }
-    res.status(200).json(user);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+  });
+});
+
+// ======================== CHANGE PASSWORD ========================
+exports.changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  
+  if (!currentPassword || !newPassword) {
+    throw new AppError('Current password and new password are required', 400);
   }
-};
+
+  const user = await User.findById(req.user.id).select('+password');
+  
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Check current password
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) {
+    throw new AppError('Current password is incorrect', 400);
+  }
+
+  // Update password (will be hashed by pre-save middleware)
+  user.password = newPassword;
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Password updated successfully'
+  });
+});
+
+// ======================== DELETE USER ACCOUNT ========================
+exports.deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+  
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  await User.findByIdAndDelete(req.user.id);
+  
+  res.status(200).json({
+    success: true,
+    message: 'User account deleted successfully'
+  });
+});
+
+// ======================== ADMIN: GET ALL USERS ========================
+exports.getAllUsers = asyncHandler(async (req, res) => {
+  const users = await User.find().select('-password');
+  
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users
+  });
+});
+
+// ======================== ADMIN: GET SINGLE USER ========================
+exports.getSingleUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id).select('-password');
+  
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+  
+  res.status(200).json({
+    success: true,
+    data: user
+  });
+});
