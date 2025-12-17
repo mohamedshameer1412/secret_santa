@@ -1,4 +1,5 @@
 import './App.css';
+import { useAuth } from './context/useAuth';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import ProtectedRoute from "./Components/ProtectedRoute";
@@ -11,6 +12,15 @@ import Dashboard from './Pages/Dashboard';
 import VillagePeople from './Pages/VillagePeople';
 import MyWishlist from './Pages/MyWishlist';
 import ChildProfile from './Pages/ChildProfile';
+
+const RootRedirect = () => {
+	const { user, loading } = useAuth();
+
+	if (loading) return <div>Loading...</div>; // optional
+
+	if (user) return <Navigate to="/dashboard" replace />;
+	return <Navigate to="/login" replace />;
+};
 
 function App() {
 	return (
@@ -76,8 +86,8 @@ function App() {
 				}
 			/>
 
-			{/* Redirect root to login */}
-			<Route path="/" element={<Navigate replace to="/login" />} />
+			{/* Root redirect */}
+			<Route path="/" element={<RootRedirect />} />
 
 			{/* Catch-all */}
 			<Route path="*" element={<Navigate replace to="/login" />} />
