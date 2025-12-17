@@ -3,6 +3,9 @@ import authService from '../services/authService';
 
 const AuthContext = createContext();
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +23,9 @@ export const AuthProvider = ({ children }) => {
             }
             
             const response = await authService.getCurrentUser();
-            setUser(response.data);
+            setUser(response.data.user ?? response.data);
+
+            setError(null);
         } catch (error) {
             if (error.response?.status !== 401) {
                 console.error('Auth check error:', error);
@@ -37,35 +42,40 @@ export const AuthProvider = ({ children }) => {
   // Auth methods
   const login = async (email, password) => {
     try {
-      const data = await authService.login(email, password);
-      setUser(data.user);
-      return data;
+        setError(null);
+
+        const data = await authService.login(email, password);
+
+        if (data.token) {
+            localStorage.setItem('token', data.token);
+        }
+        setUser(data.user);
+        return data;
     } catch (err) {
-      setError(err.message);
-      throw err;
+        setError(err.message);
+        throw err;
     }
   };
 
   const logout = async () => {
     try {
-      await authService.logout();
-      setUser(null);
+        await authService.logout();
     } catch (err) {
-      setError(err.message);
-      throw err;
-  } finally {
-      localStorage.removeItem('token');
-      setUser(null);
-  }
+        setError(err.message);
+        throw err;
+    } finally {
+        localStorage.removeItem('token');
+        setUser(null);
+    }
   };
 
 // Add these new functions
 const forgotPassword = async (email) => {
   try {
     setError(null);
-    const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
+    const response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
       method: 'POST',
-      ers: {
+      headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ email }),
@@ -87,9 +97,9 @@ const forgotPassword = async (email) => {
 const resetPassword = async (token, password) => {
   try {
     setError(null);
-    const response = await fetch(`http://localhost:5000/api/auth/reset-password/${token}`, {
+    const response = await fetch(`${API_BASE}/api/auth/reset-password/${token}`, {
       method: 'POST',
-      ers: {
+      headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ password }),
