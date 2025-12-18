@@ -84,6 +84,8 @@ const GroupChat = () => {
     const fileInputRef = useRef(null);
     const longPressTimer = useRef(null);
 
+    const prevMessageCountRef = useRef(0);
+
     useEffect(() => {
         const fetchUserRooms = async () => {
             if (authLoading) return; // Wait for auth to load
@@ -638,7 +640,18 @@ const GroupChat = () => {
     }, [gifQuery]);
 
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const chatScroll = document.querySelector('.chat-scroll');
+        if (!chatScroll) return;
+
+        const isAtBottom = chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight < 100;
+        const hasNewMessages = rawMessages.length > prevMessageCountRef.current;
+
+        // Only auto-scroll if user is at bottom AND there are new messages
+        if (hasNewMessages && isAtBottom) {
+            chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        prevMessageCountRef.current = rawMessages.length;
     }, [rawMessages]);
 
     useEffect(() => {
@@ -666,7 +679,7 @@ const GroupChat = () => {
     }
 
     return (
-        <div className="d-flex flex-column vh-100 w-100 ">
+        <div className="d-flex flex-column w-100" style={{ height: '100vh', overflow: 'hidden' }}>
             <Navbar toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
             <div className="d-flex flex-grow-1">
                 <Sidebar isOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
