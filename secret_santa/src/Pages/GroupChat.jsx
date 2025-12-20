@@ -41,6 +41,16 @@ const reactionEmojis = [
 // Quick reactions shown in context menu (most popular WhatsApp reactions - 3 to fit with plus button)
 const quickReactions = ['❤️', '😂', '👍'];
 
+// Helper to detect GIF URLs (for future GIF validation if needed)
+// eslint-disable-next-line no-unused-vars
+const isGifUrl = (text) => {
+    if (!text) return false;
+    return text.match(/\.(gif)$/i) || 
+           text.includes('tenor.com') || 
+           text.includes('giphy.com') ||
+           text.match(/https?:\/\/.*\.(gif)/i);
+};
+
 const getPrivateChatName = (roomData, userId) => {
     if (!roomData.isPrivate || !roomData.participants) return roomData.name;
     
@@ -86,18 +96,31 @@ const GroupChat = () => {
 
     const prevMessageCountRef = useRef(0);
     const initialScrollDone = useRef(false);
+    const avatarMapRef = useRef(new Map());
 
     const [imageUrls, setImageUrls] = useState({}); // Store blob URLs for images
+    
+    // Multi-room state
+    const [rooms, setRooms] = useState([]);
+    const [pinnedRooms, setPinnedRooms] = useState(new Set());
+    const [showSnow, setShowSnow] = useState(false);
+    const [showRoomList, setShowRoomList] = useState(true); // For mobile
 
     // Function to load authenticated image
     const loadAuthenticatedImage = useCallback(async (messageId, url) => {
-        if (imageUrls[messageId]) return imageUrls[messageId]; // Already loaded
+        if (imageUrls[messageId]) return imageUrls[messageId];
         
         try {
             const token = localStorage.getItem('token');
             if (!token) return null;
             
-            const response = await axios.get(`http://localhost:5000${url}`, {
+            let imageUrl = url;
+            if (!url.startsWith('http')) {
+                if (!url.startsWith('/')) imageUrl = '/' + url;
+                if (!url.startsWith('/api')) imageUrl = '/api/chat/file/' + messageId;
+            }
+            
+            const response = await axios.get(`http://localhost:5000${imageUrl}`, {
                 headers: { Authorization: `Bearer ${token}` },
                 responseType: 'blob'
             });
@@ -106,32 +129,26 @@ const GroupChat = () => {
             setImageUrls(prev => ({ ...prev, [messageId]: blobUrl }));
             return blobUrl;
         } catch (error) {
-            console.error('Error loading image:', error);
+            console.error('Error loading image:', error.response?.data || error.message);
             return null;
         }
     }, [imageUrls]);
 
     // Load images when rawMessages change
-useEffect(() => {
-    const loadImages = async () => {
-        for (const msg of rawMessages) {
-            if (msg.attachment && msg.attachment.url && !imageUrls[msg._id]) {
-                const isImage = msg.attachment.fileType === 'image' || 
-                    msg.attachment.fileName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ||
-                    msg.attachment.originalName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i);
-                
-                if (isImage) {
-                    await loadAuthenticatedImage(msg._id, msg.attachment.url);
+    useEffect(() => {
+        const loadImages = async () => {
+            for (const msg of rawMessages) {
+                if (msg.attachment?.fileType === 'image' && msg.attachment?.encryptedFileId && !imageUrls[msg._id]) {
+                    await loadAuthenticatedImage(msg._id, `/api/chat/file/${msg._id}`);
                 }
             }
+        };
+        
+        if (rawMessages.length > 0) {
+            loadImages();
         }
-    };
-    
-    if (rawMessages.length > 0) {
-        loadImages();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [rawMessages, loadAuthenticatedImage]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rawMessages]);
 
     // Cleanup blob URLs on unmount
     useEffect(() => {
@@ -144,7 +161,7 @@ useEffect(() => {
 
     useEffect(() => {
         const fetchUserRooms = async () => {
-            if (authLoading) return; // Wait for auth to load
+            if (authLoading) return;
             
             if (!user) {
                 navigate('/login');
@@ -158,20 +175,21 @@ useEffect(() => {
                     return;
                 }
                 
-                // If no roomId, fetch user's rooms and redirect to first one
-                if (!roomId && user) {
-                    const res = await axios.get(`${API_URL}/my-rooms`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
+                // Fetch all user's rooms
+                const res = await axios.get(`${API_URL}/my-rooms`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                if (res.data.rooms && res.data.rooms.length > 0) {
+                    setRooms(res.data.rooms);
                     
-                    if (res.data.rooms && res.data.rooms.length > 0) {
-                        // Redirect to first room
+                    // If no roomId in URL, redirect to first room
+                    if (!roomId) {
                         navigate(`/group-chat/${res.data.rooms[0]._id}`, { replace: true });
-                    } else {
-                        // No rooms found, redirect to dashboard
-                        alert('No chat rooms found. Please create or join a room first.');
-                        navigate('/dashboard');
                     }
+                } else {
+                    alert('No chat rooms found. Please create or join a room first.');
+                    navigate('/dashboard');
                 }
             } catch (error) {
                 console.error('Error fetching rooms:', error);
@@ -243,8 +261,6 @@ useEffect(() => {
         }
     }, [roomId, navigate]);
 
-    const avatarMapRef = useRef(new Map());
-
     const messages = useMemo(() => {
         if (!user) return [];
         
@@ -304,16 +320,22 @@ useEffect(() => {
     useEffect(() => {
         if (!roomId || !user) return;
 
+        // Reset scroll state when room changes
+        initialScrollDone.current = false;
+
         fetchRoomData();
         fetchMessages();
     }, [roomId, fetchRoomData, fetchMessages, user]);
 
     useEffect(() => {
         if (rawMessages.length > 0 && !initialScrollDone.current) {
-            setTimeout(() => {
-                chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
-                initialScrollDone.current = true;
-            }, 100);
+            // Use requestAnimationFrame to ensure DOM has updated
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
+                    initialScrollDone.current = true;
+                }, 150); // Slightly longer delay to ensure render
+            });
         }
     }, [rawMessages]);
 
@@ -638,6 +660,43 @@ useEffect(() => {
         }
     };
 
+    // Multi-room management functions
+    const handleRoomSelect = (selectedRoomId) => {
+        if (selectedRoomId === roomId) return; // Already on this room
+        
+        // Navigate to selected room (confetti now only fires on page load)
+        navigate(`/group-chat/${selectedRoomId}`);
+        
+        // Close room list on mobile
+        if (window.innerWidth <= 768) {
+            setShowRoomList(false);
+        }
+    };
+
+    const handlePinRoom = (roomIdToPin, event) => {
+        event.stopPropagation(); // Prevent room selection
+        setPinnedRooms(prev => {
+            const newPinned = new Set(prev);
+            if (newPinned.has(roomIdToPin)) {
+                newPinned.delete(roomIdToPin);
+            } else {
+                newPinned.add(roomIdToPin);
+            }
+            return newPinned;
+        });
+    };
+
+    const toggleSnow = () => {
+        setShowSnow(!showSnow);
+    };
+
+    // Get sorted rooms (pinned first)
+    const sortedRooms = useMemo(() => {
+        const pinned = rooms.filter(r => pinnedRooms.has(r._id));
+        const unpinned = rooms.filter(r => !pinnedRooms.has(r._id));
+        return [...pinned, ...unpinned];
+    }, [rooms, pinnedRooms]);
+
     const handleMessageClick = (messageId, event) => {
         // If already selected, show menu on click
         if (selectedMessageId === messageId) {
@@ -778,7 +837,23 @@ useEffect(() => {
 
     useEffect(() => {
         if (gifQuery) fetchGifs();
-    }, [gifQuery, fetchGifs]);
+        else if (showGifPicker && gifs.length === 0) fetchGifs(); // Load trending on open
+    }, [gifQuery, showGifPicker, fetchGifs, gifs.length]);
+
+    // Fire confetti once on page load (not on room switch)
+    useEffect(() => {
+        // Only fire confetti on initial mount, not when rooms change
+        const hasShownConfetti = sessionStorage.getItem('groupChatConfettiShown');
+        if (!hasShownConfetti) {
+            confetti({
+                particleCount: 50,
+                spread: 60,
+                origin: { y: 0.6 },
+                colors: ['#cc0000', '#ff0000', '#ffcccc', '#ffffff', '#00cc00']
+            });
+            sessionStorage.setItem('groupChatConfettiShown', 'true');
+        }
+    }, []); // Empty dependency array - only runs once on mount
 
     // Poll for new messages every 3 seconds
     useEffect(() => {
@@ -806,7 +881,7 @@ useEffect(() => {
             <div className="d-flex flex-grow-1">
                 <Sidebar isOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
                 <main
-                    className={`d-flex flex-column flex-grow-1 content ${sidebarOpen ? '' : 'shifted'}`}
+                    className={`d-flex flex-row flex-grow-1 content ${sidebarOpen ? '' : 'shifted'}`}
                     style={{ 
                         paddingTop: '66px',
                         paddingBottom: '26px',
@@ -814,8 +889,119 @@ useEffect(() => {
                         overflow: 'hidden'
                     }}
                 >
-                    <div className="d-flex flex-column flex-grow-1 w-100 h-100 border border-danger-subtle border-4 shadow-sm" style={{ margin: '16px' }}>
-                        <div className="p-3 bg-white border-bottom border-danger-subtle">
+                    {/* Room List Sidebar - Left Column */}
+                    <div className={`room-list-sidebar ${showRoomList ? 'show' : ''}`}>
+                        <div className="room-list-header">
+                            <h4 className="mb-0">
+                                <i className="fa-solid fa-comments me-2"></i>
+                                Group Chats
+                            </h4>
+                            <button 
+                                className="btn btn-sm btn-outline-light"
+                                onClick={toggleSnow}
+                                title={showSnow ? "Disable Snow" : "Enable Snow"}
+                            >
+                                {showSnow ? <i className="fa-solid fa-snowflake"></i> : <i className="fa-regular fa-snowflake"></i>}
+                            </button>
+                        </div>
+
+                        {showSnow && (
+                            <div className="snow-container">
+                                {[...Array(50)].map((_, i) => (
+                                    <div key={i} className="snowflake" style={{
+                                        left: `${Math.random() * 100}%`,
+                                        animationDelay: `${Math.random() * 5}s`,
+                                        animationDuration: `${8 + Math.random() * 8}s` // Slower: 8-16s instead of 3-7s
+                                    }}>❄</div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="room-cards-container">
+                            {sortedRooms.map((r, index) => {
+                                const isPinned = pinnedRooms.has(r._id);
+                                const isActive = r._id === roomId;
+                                const unreadCount = r.unreadCount || 0;
+                                
+                                // Calculate display name for private chats
+                                let displayName = r.name;
+                                if (r.isPrivate && r.participants) {
+                                    const otherParticipant = r.participants.find(
+                                        p => p._id?.toString() !== user?.id?.toString()
+                                    );
+                                    if (otherParticipant) {
+                                        displayName = otherParticipant.name || otherParticipant.username || 'User';
+                                    }
+                                }
+
+                                return (
+                                    <div
+                                        key={r._id}
+                                        className={`room-card ${isActive ? 'active' : ''}`}
+                                        onClick={() => handleRoomSelect(r._id)}
+                                        style={{
+                                            animationDelay: `${index * 0.1}s`
+                                        }}
+                                    >
+                                        <div className="room-card-content">
+                                            <div className="room-card-header">
+                                                <h6 className="room-name">
+                                                    {r.isPrivate ? (
+                                                        <><i className="fa-solid fa-user me-2"></i>{displayName}</>
+                                                    ) : (
+                                                        <><i className="fa-solid fa-users me-2"></i>{displayName}</>
+                                                    )}
+                                                </h6>
+                                                {unreadCount > 0 && (
+                                                    <span className="unread-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                                                )}
+                                            </div>
+                                            <p className="room-last-message">
+                                                {r.lastMessage?.text || 'No messages yet'}
+                                            </p>
+                                            <div className="room-card-footer">
+                                                <div className="room-info">
+                                                    <span className="participant-count">
+                                                        <i className="fa-solid fa-user-group me-1"></i>
+                                                        {r.participants?.length || 0}
+                                                    </span>
+                                                    {r.lastMessage?.createdAt && (
+                                                        <span className="last-message-time">
+                                                            {new Date(r.lastMessage.createdAt).toLocaleDateString()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="room-actions">
+                                                    <button
+                                                        className={`btn btn-sm ${isPinned ? 'btn-warning' : 'btn-outline-secondary'}`}
+                                                        onClick={(e) => handlePinRoom(r._id, e)}
+                                                        title={isPinned ? "Unpin" : "Pin"}
+                                                    >
+                                                        <i className={`fa-solid fa-thumbtack${isPinned ? '' : ' opacity-50'}`}></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Mobile Room List Toggle */}
+                    {!showRoomList && (
+                        <button 
+                            className="mobile-room-toggle"
+                            onClick={() => setShowRoomList(true)}
+                        >
+                            <i className="fa-solid fa-bars"></i>
+                        </button>
+                    )}
+
+                    {/* Chat View - Right Column */}
+                    <div className="chat-room-view">
+                        <div className="chat-container-wrapper d-flex flex-column w-100 border border-danger-subtle border-4 shadow-sm" style={{ margin: '16px', marginLeft: 0, marginTop: '20px', height: 'calc(100vh - 128px)' }}>
+                        <div className="chat-header p-3 bg-white border-bottom border-danger-subtle" style={{ flexShrink: 0 }}>
                             <h5 className="mb-0 text-danger">
                                 <i className="fa-solid fa-mask me-2"></i>
                                 {room?.isPrivate ? (
@@ -856,8 +1042,8 @@ useEffect(() => {
                             </div>
                         </div>
 
-                        <div className="flex-grow-1 d-flex flex-column justify-content-between animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)', minHeight: 0 }}>
-                            <div className="chat-scroll flex-grow-1 overflow-auto px-3 py-2" style={{ paddingBottom: '80px' }}>
+                        <div className="d-flex flex-column animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+                            <div className="chat-scroll overflow-auto px-3 py-2" style={{ flex: '1 1 auto', overflowY: 'auto' }}>
                                 {messages.map((msg, index) => {
                                     const isUser = msg.isCurrentUser;
                                     const isSelected = selectedMessageId === msg._id;
@@ -1353,7 +1539,7 @@ useEffect(() => {
                                 </div>
                             )}
                             
-                            <div className="d-flex align-items-end justify-content-between gap-3 p-3 bg-white shadow-sm flex-wrap border-top border-4 border-danger-subtle" style={{ position: 'sticky', bottom: 0, zIndex: 10 }}>
+                            <div className="d-flex align-items-end justify-content-between gap-3 p-3 bg-white shadow-sm flex-wrap border-top border-4 border-danger-subtle" style={{ flexShrink: 0, zIndex: 10 }}>
                                 {/* Edit mode indicator */}
                                 {editingMessageId && (
                                     <div className="w-100 d-flex justify-content-between align-items-center bg-info bg-opacity-10 p-2 rounded mb-2">
@@ -1506,6 +1692,7 @@ useEffect(() => {
                                     </button>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </main>

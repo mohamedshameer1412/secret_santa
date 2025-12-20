@@ -84,3 +84,538 @@
 .position-absolute.bg-white.shadow {
     z-index: 1040;
 }
+
+/* === MULTI-ROOM FESTIVE ADDITIONS === */
+
+/* Room List Sidebar (Left Column) */
+.room-list-sidebar {
+    width: 350px;
+    min-width: 350px;
+    max-width: 350px;
+    height: calc(100vh - 92px);
+    background: linear-gradient(180deg, rgba(255, 245, 245, 0.95), rgba(255, 250, 250, 0.95));
+    border-right: 3px solid rgba(204, 0, 0, 0.1);
+    overflow-y: auto;
+    padding: 16px 12px;
+    backdrop-filter: blur(8px);
+}
+
+.room-list-header {
+    background: linear-gradient(135deg, #ff1a1a, #cc0000);
+    color: white;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(204, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.room-list-header h4 {
+    margin: 0;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.snowflake-icon {
+    animation: snowflakeRotate 3s infinite ease-in-out;
+}
+
+@keyframes snowflakeRotate {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(180deg); }
+}
+
+/* Room Card */
+.room-card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-left: 3px solid transparent;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    animation: slideInLeft 0.4s ease-out backwards;
+    position: relative;
+}
+
+.room-card:hover {
+    transform: translateX(6px);
+    box-shadow: 0 6px 16px rgba(204, 0, 0, 0.12);
+    border-left-color: #ff1a1a;
+}
+
+.room-card.active {
+    background: linear-gradient(135deg, rgba(255, 26, 26, 0.08), rgba(204, 0, 0, 0.05));
+    border-left-color: #ff1a1a;
+    box-shadow: 0 0 15px rgba(255, 26, 26, 0.3);
+    transform: translateX(6px);
+}
+
+/* Staggered card animation */
+.room-card:nth-child(1) { animation-delay: 0s; }
+.room-card:nth-child(2) { animation-delay: 0.05s; }
+.room-card:nth-child(3) { animation-delay: 0.1s; }
+.room-card:nth-child(4) { animation-delay: 0.15s; }
+.room-card:nth-child(5) { animation-delay: 0.2s; }
+.room-card:nth-child(6) { animation-delay: 0.25s; }
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.room-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 8px;
+}
+
+.room-card-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+.room-card.active .room-card-name {
+    color: #ff1a1a;
+}
+
+.unread-badge {
+    background: linear-gradient(135deg, #ff1a1a, #cc0000);
+    color: white;
+    border-radius: 10px;
+    padding: 2px 7px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 20px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(255, 26, 26, 0.4);
+    animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.room-card-message {
+    color: #666;
+    font-size: 0.85rem;
+    margin: 6px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.room-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #999;
+}
+
+.room-participant-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.room-quick-actions {
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.room-card:hover .room-quick-actions {
+    opacity: 1;
+}
+
+.room-action-btn {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.room-action-btn:hover {
+    background: rgba(204, 0, 0, 0.1);
+    color: #ff1a1a;
+}
+
+.room-action-btn.pinned {
+    color: #ff1a1a;
+    opacity: 1 !important;
+}
+
+/* Chat room container */
+.chat-room-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    margin-top: 20px;
+    position: relative;
+}
+
+.chat-room-container.slide-in {
+    animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Empty state when no room selected */
+.empty-room-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #999;
+    text-align: center;
+    padding: 40px;
+}
+
+.empty-room-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    opacity: 0.4;
+    animation: floatIcon 3s infinite ease-in-out;
+}
+
+@keyframes floatIcon {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+}
+
+.empty-room-state h3 {
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.empty-room-state p {
+    color: #999;
+    font-size: 0.95rem;
+}
+
+/* Snow toggle button */
+.snow-toggle-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.snow-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .room-list-sidebar-mobile {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1100;
+        transform: translateX(-100%);
+        transition: transform 0.3s;
+    }
+    
+    .room-list-sidebar-mobile.show {
+        transform: translateX(0);
+    }
+    
+    .mobile-back-btn {
+        display: flex !important;
+    }
+}
+
+/* Scrollbar for room list */
+.room-list-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.room-list-sidebar::-webkit-scrollbar-track {
+    background: rgba(204, 0, 0, 0.05);
+    border-radius: 10px;
+}
+
+.room-list-sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #ff1a1a, #cc0000);
+    border-radius: 10px;
+}
+
+.room-list-sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #cc0000, #990000);
+}
+
+/* Loading skeleton for room cards */
+.room-card-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 12px;
+    height: 85px;
+    margin-bottom: 10px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Snow animation */
+.snow-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.snowflake {
+    position: absolute;
+    top: -10px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1em;
+    animation: snowfall linear infinite;
+}
+
+@keyframes snowfall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0.3;
+    }
+}
+
+/* Chat room view */
+.chat-room-view {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    min-width: 0 !important; /* Prevent flex item from overflowing */
+    max-height: calc(100vh - 92px) !important;
+}
+
+/* Chat container - main chat box wrapper */
+.chat-container-wrapper {
+    height: calc(100vh - 128px) !important;
+    max-height: calc(100vh - 128px) !important;
+    min-height: calc(100vh - 128px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Chat header - fixed at top */
+.chat-header {
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+}
+
+/* Chat scroll container */
+.chat-scroll {
+    position: relative !important;
+    scroll-behavior: smooth !important;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+}
+
+.chat-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+    background: rgba(204, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(204, 0, 0, 0.5);
+}
+
+/* Room card content and structure */
+.room-card-content {
+    width: 100%;
+}
+
+.room-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.room-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+.room-last-message {
+    color: #666;
+    font-size: 0.85rem;
+    margin: 6px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.room-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.room-info {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #999;
+}
+
+.participant-count,
+.last-message-time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.room-actions {
+    display: flex;
+    gap: 6px;
+}
+
+/* Mobile room toggle button */
+.mobile-room-toggle {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff1a1a, #cc0000);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(204, 0, 0, 0.4);
+    font-size: 1.2rem;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.mobile-room-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(204, 0, 0, 0.5);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .room-list-sidebar {
+        position: fixed;
+        top: 66px;
+        left: 0;
+        width: 100%;
+        height: calc(100vh - 66px);
+        z-index: 1100;
+        transform: translateX(-100%);
+        transition: transform 0.3s;
+        margin: 0;
+    }
+    
+    .room-list-sidebar.show {
+        transform: translateX(0);
+    }
+    
+    .mobile-room-toggle {
+        display: flex;
+    }
+    
+    .chat-room-view {
+        width: 100%;
+    }
+}
+
+/* Room cards container with smooth scrolling */
+.room-cards-container {
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.room-cards-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.room-cards-container::-webkit-scrollbar-track {
+    background: rgba(204, 0, 0, 0.05);
+    border-radius: 10px;
+}
+
+.room-cards-container::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #ff1a1a, #cc0000);
+    border-radius: 10px;
+}
+
+.room-cards-container::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #cc0000, #990000);
+}
