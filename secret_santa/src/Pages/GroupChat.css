@@ -421,6 +421,13 @@
     animation: snowfall linear infinite;
 }
 
+/* Reduce snowflakes on mobile for performance */
+@media (max-width: 768px) {
+    .snowflake:nth-child(n+26) {
+        display: none;
+    }
+}
+
 @keyframes snowfall {
     0% {
         transform: translateY(0) rotate(0deg);
@@ -618,4 +625,189 @@
 
 .room-cards-container::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #cc0000, #990000);
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+
+/* Large Desktops (1920px and above) */
+@media (min-width: 1920px) {
+    .room-list-sidebar {
+        width: 400px;
+        min-width: 400px;
+        max-width: 400px;
+    }
+    
+    .room-card {
+        padding: 18px;
+        font-size: 1.05rem;
+    }
+    
+    .chat-container-wrapper {
+        margin-right: 24px !important;
+    }
+}
+
+/* Desktop (1440px - 1919px) */
+@media (min-width: 1440px) and (max-width: 1919px) {
+    .room-list-sidebar {
+        width: 380px;
+        min-width: 380px;
+        max-width: 380px;
+    }
+}
+
+/* Laptop (1024px - 1439px) - Default, no changes needed */
+@media (min-width: 1024px) and (max-width: 1439px) {
+    .room-list-sidebar {
+        width: 350px;
+        min-width: 350px;
+        max-width: 350px;
+    }
+}
+
+/* Small Laptop / Tablet Landscape (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .room-list-sidebar {
+        width: 280px;
+        min-width: 280px;
+        max-width: 280px;
+    }
+    
+    .room-card {
+        padding: 12px;
+    }
+    
+    .room-list-header h4 {
+        font-size: 1rem;
+    }
+    
+    .chat-container-wrapper {
+        margin-right: 12px !important;
+    }
+    
+    .room-name {
+        font-size: 0.9rem;
+    }
+    
+    .room-last-message {
+        font-size: 0.8rem;
+    }
+}
+
+/* Mobile and Tablet Portrait (below 768px) */
+@media (max-width: 768px) {
+    .room-list-sidebar {
+        position: fixed;
+        top: 66px;
+        left: 0;
+        width: 100%;
+        max-width: 100%;
+        height: calc(100vh - 66px);
+        z-index: 1100;
+        transform: translateX(-100%);
+        transition: transform 0.3s;
+        margin: 0;
+    }
+    
+    .room-list-sidebar.show {
+        transform: translateX(0);
+    }
+    
+    .mobile-room-toggle {
+        display: flex;
+    }
+    
+    .chat-room-view {
+        width: 100%;
+    }
+    
+    .chat-container-wrapper {
+        margin: 8px !important;
+        margin-top: 12px !important;
+        height: calc(100vh - 96px) !important;
+        max-height: calc(100vh - 96px) !important;
+        min-height: calc(100vh - 96px) !important;
+    }
+    
+    .chat-header {
+        padding: 12px !important;
+    }
+    
+    .chat-header h5 {
+        font-size: 1rem;
+    }
+    
+    .chat-header .badge {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+    
+    /* Adjust message bubbles for mobile */
+    .message-bubble {
+        max-width: 85% !important;
+    }
+    
+    /* Make room cards more touch-friendly */
+    .room-card {
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+}
+
+/* Small Mobile (below 480px) */
+@media (max-width: 480px) {
+    .chat-container-wrapper {
+        margin: 4px !important;
+        margin-top: 8px !important;
+        height: calc(100vh - 88px) !important;
+        max-height: calc(100vh - 88px) !important;
+        min-height: calc(100vh - 88px) !important;
+    }
+    
+    .chat-header h5 {
+        font-size: 0.9rem;
+    }
+    
+    .chat-header .badge {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+    }
+    
+    .room-list-header h4 {
+        font-size: 1rem;
+    }
+    
+    .room-card {
+        padding: 14px;
+    }
+    
+    .room-name {
+        font-size: 0.9rem;
+    }
+    
+    /* Make emojis and buttons bigger for touch */
+    .icon-btn {
+        width: 40px !important;
+        height: 40px !important;
+    }
+}
+
+/* Adjust for very wide screens (ultrawide monitors) */
+@media (min-width: 2560px) {
+    .room-list-sidebar {
+        width: 450px;
+        min-width: 450px;
+        max-width: 450px;
+    }
+    
+    .room-card {
+        padding: 20px;
+        font-size: 1.1rem;
+    }
+    
+    .chat-container-wrapper {
+        max-width: 2000px;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
 }

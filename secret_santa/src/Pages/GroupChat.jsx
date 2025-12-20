@@ -104,7 +104,7 @@ const GroupChat = () => {
     const [rooms, setRooms] = useState([]);
     const [pinnedRooms, setPinnedRooms] = useState(new Set());
     const [showSnow, setShowSnow] = useState(false);
-    const [showRoomList, setShowRoomList] = useState(true); // For mobile
+    const [showRoomList, setShowRoomList] = useState(window.innerWidth > 768); // Hide on mobile by default
 
     // Function to load authenticated image
     const loadAuthenticatedImage = useCallback(async (messageId, url) => {
@@ -138,7 +138,14 @@ const GroupChat = () => {
     useEffect(() => {
         const loadImages = async () => {
             for (const msg of rawMessages) {
-                if (msg.attachment?.fileType === 'image' && msg.attachment?.encryptedFileId && !imageUrls[msg._id]) {
+                // Check if message has an image attachment
+                const hasAttachment = msg.attachment && (
+                    msg.attachment.fileType === 'image' ||
+                    msg.attachment.fileName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ||
+                    msg.attachment.originalName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)
+                );
+                
+                if (hasAttachment && !imageUrls[msg._id]) {
                     await loadAuthenticatedImage(msg._id, `/api/chat/file/${msg._id}`);
                 }
             }
@@ -854,6 +861,18 @@ const GroupChat = () => {
             sessionStorage.setItem('groupChatConfettiShown', 'true');
         }
     }, []); // Empty dependency array - only runs once on mount
+
+    // Handle window resize for responsive room list
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth > 768) {
+                setShowRoomList(true); // Always show on desktop
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Poll for new messages every 3 seconds
     useEffect(() => {
