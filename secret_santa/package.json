@@ -16,7 +16,7 @@
     "canvas-confetti": "^1.9.3",
     "dotenv": "^16.5.0",
     "emoji-picker-react": "^4.13.2",
-    "framer-motion": "^12.23.12",
+    "framer-motion": "^12.23.26",
     "gsap": "^3.13.0",
     "jsonwebtoken": "^9.0.2",
     "react": "^19.1.0",

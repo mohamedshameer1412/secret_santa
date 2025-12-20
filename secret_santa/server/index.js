@@ -54,6 +54,10 @@ const connectDB = async () => {
     const conn = await mongoose.connect(process.env.MONGODB_URI);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     
+    // Initialize GridFS after successful connection
+    const { initGridFS } = require('./utils/gridFsStorage');
+    initGridFS();
+    
     mongoose.connection.on('error', err => {
       console.error(`MongoDB connection error: ${err}`);
     });

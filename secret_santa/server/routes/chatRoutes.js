@@ -7,22 +7,11 @@ const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
+const { uploadToGridFS, getFileStream, deleteFromGridFS } = require('../utils/gridFsStorage');
+const crypto = require('crypto');
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../uploads/chat-files');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// Configure multer for memory storage (GridFS)
+const storage = multer.memoryStorage();
 
 const upload = multer({
     storage,
@@ -38,6 +27,25 @@ const upload = multer({
         }
     }
 });
+
+// Helper function to encrypt file metadata
+const encryptFileMetadata = (text, key) => {
+    const algorithm = 'aes-256-cbc';
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(algorithm, Buffer.from(key, 'hex'), iv);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const hmac = crypto.createHmac('sha256', Buffer.from(key, 'hex'));
+    hmac.update(encrypted + iv.toString('hex'));
+    const tag = hmac.digest('hex');
+    
+    return {
+        encrypted: encrypted,
+        iv: iv.toString('hex'),
+        tag: tag
+    };
+};
 
 // Anonymous name pool
 const anonymousNamePool = [
@@ -176,15 +184,32 @@ router.get('/:roomId/messages', protect, asyncHandler(async (req, res) => {
 
             // Decrypt attachment if exists
             if (msg.attachment) {
-                decrypted.attachment = {
-                    ...msg.attachment,
-                    url: `/api/chat/file/${msg._id}`,
-                    originalName: Message.decryptText(
-                        msg.attachment.fileName, 
-                        msg.attachment.iv, 
-                        msg.attachment.tag
-                    )
-                };
+                try {
+                    // Decrypt filename using its own IV and tag
+                    const decryptedFileName = Message.decryptText(
+                        msg.attachment.encryptedFileName,
+                        msg.attachment.ivFileName,
+                        msg.attachment.tagFileName
+                    );
+                    
+                    decrypted.attachment = {
+                        fileType: msg.attachment.fileType,
+                        size: msg.attachment.size,
+                        url: `/api/chat/file/${msg._id}`,
+                        originalName: decryptedFileName,
+                        fileName: decryptedFileName
+                    };
+                } catch (attachError) {
+                    console.error('Failed to decrypt attachment:', msg._id, attachError.message);
+                    // Include attachment but mark as undecryptable
+                    decrypted.attachment = {
+                        fileType: msg.attachment.fileType,
+                        size: msg.attachment.size,
+                        url: `/api/chat/file/${msg._id}`,
+                        originalName: '[Encrypted File]',
+                        fileName: '[Encrypted File]'
+                    };
+                }
             }
 
             // Map reactions with anonymous names
@@ -506,77 +531,76 @@ router.delete('/:roomId/message/:messageId', protect, asyncHandler(async (req, r
 // @access  Private
 router.post('/:roomId/upload', protect, upload.single('file'), asyncHandler(async (req, res) => {
     const { roomId } = req.params;
-    const { text } = req.body;
 
     if (!req.file) {
         throw new AppError('No file uploaded', 400);
     }
 
     const room = await ChatRoom.findById(roomId);
-    
     if (!room) {
-        throw new AppError('Room not found', 404);
+        throw new AppError('Chat room not found', 404);
     }
 
-    const isParticipant = room.participants.some(
-        p => p.toString() === req.user.id
+    // Auto-join user to room if not already a participant
+    const validParticipants = (room.participants || []).filter(p => p != null);
+    const isMember = validParticipants.some(
+        p => p.toString() === req.user.id.toString()
     );
-    
-    if (!isParticipant) {
-        throw new AppError('You are not a participant in this room', 403);
+
+    if (!isMember) {
+        room.participants.push(req.user.id);
+        await room.save();
     }
 
-    // Encrypt file path
-    const { encryptedText: encryptedUrl, iv: fileIv, tag: fileTag } = 
-        Message.encryptText(req.file.path);
+    // Upload file to GridFS
+    const fileBuffer = req.file.buffer;
+    const originalName = req.file.originalname;
+    const mimeType = req.file.mimetype;
 
-    // Encrypt filename
-    const { encryptedText: encryptedName, iv: nameIv, tag: nameTag } = 
-        Message.encryptText(req.file.originalname);
-
-    // Encrypt message text
-    const messageText = text || `[File: ${req.file.originalname}]`;
-    const { encryptedText, iv, tag } = Message.encryptText(messageText);
-
-    const message = await Message.create({
-        roomId,
-        sender: req.user.id,
-        encryptedText,
-        iv,
-        tag,
-        attachment: {
-            encryptedUrl,
-            iv: fileIv,
-            tag: fileTag,
-            fileType: req.file.mimetype.split('/')[0],
-            fileName: encryptedName,
-            fileSize: req.file.size
-        },
-        status: 'sent'
+    const gridFsFile = await uploadToGridFS(fileBuffer, originalName, {
+        originalName,
+        mimeType,
+        size: req.file.size,
+        uploadedBy: req.user.id,
+        roomId: roomId
     });
 
-    const populatedMessage = await Message.findById(message._id)
-        .populate('sender', 'name username profilePic')
-        .lean();
-    
-    populatedMessage.text = Message.decryptText(
-        populatedMessage.encryptedText,
-        populatedMessage.iv,
-        populatedMessage.tag
-    );
+    // Use Message encryption (same global keys) for file metadata
+    const encryptedFileName = Message.encryptText(originalName);
+    const fileIdString = gridFsFile.fileId.toString();
+    const encryptedFileId = Message.encryptText(fileIdString);
 
-    if (populatedMessage.attachment) {
-        populatedMessage.attachment.url = `/api/chat/file/${message._id}`;
-        populatedMessage.attachment.originalName = Message.decryptText(
-            populatedMessage.attachment.fileName,
-            nameIv,
-            nameTag
-        );
-    }
+    // Generate anonymous name if not already set
+    const anonymousName = generateAnonymousName(room, req.user.id);
 
-    res.json({
+    // Encrypt empty message text for file-only messages
+    const emptyMessage = Message.encryptText('');
+
+    // Create message with encrypted file reference
+    const message = new Message({
+        roomId: roomId,
+        sender: req.user.id,
+        encryptedText: emptyMessage.encryptedText,
+        iv: emptyMessage.iv,
+        tag: emptyMessage.tag,
+        attachment: {
+            encryptedFileId: encryptedFileId.encryptedText,
+            encryptedFileName: encryptedFileName.encryptedText,
+            ivFileId: encryptedFileId.iv,
+            ivFileName: encryptedFileName.iv,
+            tagFileId: encryptedFileId.tag,
+            tagFileName: encryptedFileName.tag,
+            fileType: mimeType.startsWith('image/') ? 'image' : 'file',
+            size: req.file.size
+        }
+    });
+
+    await message.save();
+    await room.save();
+
+    res.status(201).json({
         success: true,
-        message: populatedMessage
+        message: message
     });
 }));
 
@@ -584,34 +608,59 @@ router.post('/:roomId/upload', protect, upload.single('file'), asyncHandler(asyn
 // @desc    Serve uploaded files (with authentication)
 // @access  Private
 router.get('/file/:messageId', protect, asyncHandler(async (req, res) => {
-    const message = await Message.findById(req.params.messageId);
-    
+    const { messageId } = req.params;
+
+    // Find the message containing this file
+    const message = await Message.findById(messageId);
+
     if (!message || !message.attachment) {
         throw new AppError('File not found', 404);
     }
 
     // Verify user is participant in room
     const room = await ChatRoom.findById(message.roomId);
+    
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+    
     const isParticipant = room.participants.some(
         p => p.toString() === req.user.id
     );
     
     if (!isParticipant) {
-        throw new AppError('Access denied', 403);
+        throw new AppError('You are not authorized to access this file', 403);
     }
 
-    // Decrypt file path
-    const filePath = Message.decryptText(
-        message.attachment.encryptedUrl,
-        message.attachment.iv,
-        message.attachment.tag
+    // Decrypt file ID using Message.decryptText
+    const decryptedFileId = Message.decryptText(
+        message.attachment.encryptedFileId,
+        message.attachment.ivFileId,
+        message.attachment.tagFileId
     );
 
-    if (!fs.existsSync(filePath)) {
-        throw new AppError('File not found on server', 404);
-    }
+    // Decrypt filename for Content-Disposition header
+    const decryptedFileName = Message.decryptText(
+        message.attachment.encryptedFileName,
+        message.attachment.ivFileName,
+        message.attachment.tagFileName
+    );
 
-    res.sendFile(filePath);
+    // Stream file from GridFS
+    const fileStream = getFileStream(decryptedFileId);
+
+    fileStream.on('error', (err) => {
+        console.error('GridFS stream error:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Error retrieving file' });
+        }
+    });
+
+    // Set appropriate headers
+    res.setHeader('Content-Type', message.attachment.fileType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${decryptedFileName}"`);
+    
+    fileStream.pipe(res);
 }));
 
 // @route   POST /api/chat/:roomId/message/:messageId/reaction

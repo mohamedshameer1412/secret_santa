@@ -85,6 +85,62 @@ const GroupChat = () => {
     const longPressTimer = useRef(null);
 
     const prevMessageCountRef = useRef(0);
+    const initialScrollDone = useRef(false);
+
+    const [imageUrls, setImageUrls] = useState({}); // Store blob URLs for images
+
+    // Function to load authenticated image
+    const loadAuthenticatedImage = useCallback(async (messageId, url) => {
+        if (imageUrls[messageId]) return imageUrls[messageId]; // Already loaded
+        
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return null;
+            
+            const response = await axios.get(`http://localhost:5000${url}`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
+            
+            const blobUrl = URL.createObjectURL(response.data);
+            setImageUrls(prev => ({ ...prev, [messageId]: blobUrl }));
+            return blobUrl;
+        } catch (error) {
+            console.error('Error loading image:', error);
+            return null;
+        }
+    }, [imageUrls]);
+
+    // Load images when rawMessages change
+useEffect(() => {
+    const loadImages = async () => {
+        for (const msg of rawMessages) {
+            if (msg.attachment && msg.attachment.url && !imageUrls[msg._id]) {
+                const isImage = msg.attachment.fileType === 'image' || 
+                    msg.attachment.fileName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ||
+                    msg.attachment.originalName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i);
+                
+                if (isImage) {
+                    await loadAuthenticatedImage(msg._id, msg.attachment.url);
+                }
+            }
+        }
+    };
+    
+    if (rawMessages.length > 0) {
+        loadImages();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [rawMessages, loadAuthenticatedImage]);
+
+    // Cleanup blob URLs on unmount
+    useEffect(() => {
+        return () => {
+            Object.values(imageUrls).forEach(url => {
+                if (url) URL.revokeObjectURL(url);
+            });
+        };
+    }, [imageUrls]);
 
     useEffect(() => {
         const fetchUserRooms = async () => {
@@ -176,7 +232,7 @@ const GroupChat = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
-            setRawMessages(res.data.messages);
+            setRawMessages(res.data.messages || res.data);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching messages:', error);
@@ -186,6 +242,8 @@ const GroupChat = () => {
             }
         }
     }, [roomId, navigate]);
+
+    const avatarMapRef = useRef(new Map());
 
     const messages = useMemo(() => {
         if (!user) return [];
@@ -201,6 +259,15 @@ const GroupChat = () => {
             // Use anonymous name if available (anonymous mode)
             const displayName = msg.anonymousName || msg.sender?.name || msg.sender?.username || 'Anonymous';
             
+            // Generate consistent random avatar per sender
+            let avatarUrl;
+            if (!avatarMapRef.current.has(senderId)) {
+                avatarUrl = msg.sender?.profilePic || '/assets/santa2.png';
+                avatarMapRef.current.set(senderId, avatarUrl);
+            } else {
+                avatarUrl = avatarMapRef.current.get(senderId);
+            }
+            
             return {
                 _id: msg._id,
                 from: displayName,
@@ -209,7 +276,7 @@ const GroupChat = () => {
                     hour: '2-digit', 
                     minute: '2-digit' 
                 }),
-                img: '/assets/santa2.png', // Use same avatar for all (anonymous)
+                img: avatarUrl, // Random avatar per anonymous user (consistent per sender)
                 isCurrentUser,
                 isEdited: msg.isEdited,
                 isDeleted: msg.isDeleted,
@@ -240,6 +307,15 @@ const GroupChat = () => {
         fetchRoomData();
         fetchMessages();
     }, [roomId, fetchRoomData, fetchMessages, user]);
+
+    useEffect(() => {
+        if (rawMessages.length > 0 && !initialScrollDone.current) {
+            setTimeout(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
+                initialScrollDone.current = true;
+            }, 100);
+        }
+    }, [rawMessages]);
 
     // Typing indicator logic
     const setUserTyping = (isTyping) => {
@@ -281,7 +357,8 @@ const GroupChat = () => {
                         toast: true,
                         position: 'top-end',
                         showConfirmButton: false,
-                        timer: 2000
+                        timer: 5000,
+                        timerProgressBar: true
                     });
                 } else {
                     // Send new message
@@ -309,7 +386,8 @@ const GroupChat = () => {
                         toast: true,
                         position: 'top-end',
                         showConfirmButton: false,
-                        timer: 3000
+                        timer: 3000,
+                        timerProgressBar: true
                     });
                 }
             } finally {
@@ -331,7 +409,8 @@ const GroupChat = () => {
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: false,
-                timer: 3000
+                timer: 3000,
+                timerProgressBar: true
             });
             return;
         }
@@ -372,7 +451,8 @@ const GroupChat = () => {
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: false,
-                timer: 2000
+                timer: 2000,
+                timerProgressBar: true
             });
 
             fetchMessages();
@@ -387,13 +467,52 @@ const GroupChat = () => {
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: false,
-                timer: 3000
+                timer: 3000,
+                timerProgressBar: true
             });
         } finally {
             setUploadingFile(false);
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
+        }
+    };
+
+    // Handle authenticated file download
+    const handleFileDownload = async (messageId, url, fileName) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+            
+            const response = await axios.get(`http://localhost:5000${url}`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
+            
+            // Create download link
+            const blobUrl = URL.createObjectURL(response.data);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = fileName || 'download';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+        } catch (error) {
+            console.error('Error downloading file:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Download failed',
+                text: 'Could not download file. Please try again.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 5000,
+                timerProgressBar: true
+            });
         }
     };
 
@@ -429,7 +548,8 @@ const GroupChat = () => {
                     toast: true,
                     position: 'top-end',
                     showConfirmButton: false,
-                    timer: 2000
+                    timer: 2000,
+                    timerProgressBar: true
                 });
 
                 fetchMessages();
@@ -442,7 +562,8 @@ const GroupChat = () => {
                     toast: true,
                     position: 'top-end',
                     showConfirmButton: false,
-                    timer: 3000
+                    timer: 4000,
+                    timerProgressBar: true
                 });
             }
         }
@@ -468,7 +589,8 @@ const GroupChat = () => {
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: false,
-                timer: 3000
+                timer: 4000,
+                timerProgressBar: true
             });
         }
     };
@@ -685,9 +807,14 @@ const GroupChat = () => {
                 <Sidebar isOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
                 <main
                     className={`d-flex flex-column flex-grow-1 content ${sidebarOpen ? '' : 'shifted'}`}
-                    style={{ marginTop: '56px' }}
+                    style={{ 
+                        paddingTop: '66px',
+                        paddingBottom: '26px',
+                        height: '100vh',
+                        overflow: 'hidden'
+                    }}
                 >
-                    <div className=" d-flex flex-column flex-grow-1 w-100 h-100 mt-3 pt-3 border border-danger-subtle border-4 shadow-sm">
+                    <div className="d-flex flex-column flex-grow-1 w-100 h-100 border border-danger-subtle border-4 shadow-sm" style={{ margin: '16px' }}>
                         <div className="p-3 bg-white border-bottom border-danger-subtle">
                             <h5 className="mb-0 text-danger">
                                 <i className="fa-solid fa-mask me-2"></i>
@@ -729,8 +856,8 @@ const GroupChat = () => {
                             </div>
                         </div>
 
-                        <div className=" flex-grow-1 d-flex flex-column justify-content-between animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)' }}>
-                            <div className="chat-scroll flex-grow-1 overflow-auto px-3 py-2" style={{ maxHeight: 'calc(100vh - 240px)' }}>
+                        <div className="flex-grow-1 d-flex flex-column justify-content-between animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)', minHeight: 0 }}>
+                            <div className="chat-scroll flex-grow-1 overflow-auto px-3 py-2" style={{ paddingBottom: '80px' }}>
                                 {messages.map((msg, index) => {
                                     const isUser = msg.isCurrentUser;
                                     const isSelected = selectedMessageId === msg._id;
@@ -784,33 +911,54 @@ const GroupChat = () => {
                                                                     msg.attachment.fileName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ||
                                                                     msg.attachment.originalName?.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i);
                                                                 
-                                                                return isImage ? (
-                                                                    <img 
-                                                                        src={`http://localhost:5000${msg.attachment.url}`}
-                                                                        alt="attachment"
-                                                                        className="img-fluid rounded shadow-sm"
-                                                                        style={{ maxWidth: '250px', maxHeight: '250px', objectFit: 'cover', cursor: 'pointer' }}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            window.open(`http://localhost:5000${msg.attachment.url}`, '_blank');
-                                                                        }}
-                                                                    />
-                                                                ) : (
-                                                                    <a 
-                                                                        href={`http://localhost:5000${msg.attachment.url}`}
-                                                                        download
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className={`btn btn-sm ${isUser ? 'btn-light' : 'btn-danger'} d-flex align-items-center gap-2`}
-                                                                        style={{ width: 'fit-content' }}
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                    >
-                                                                        <i className="fa-solid fa-file"></i>
-                                                                        <span className="text-truncate" style={{ maxWidth: '150px' }}>
-                                                                            {msg.attachment.fileName || msg.attachment.originalName || 'File'}
-                                                                        </span>
-                                                                    </a>
-                                                                );
+                                                                if (isImage) {
+                                                                    const blobUrl = imageUrls[msg._id];
+                                                                    
+                                                                    return blobUrl ? (
+                                                                        <img 
+                                                                            src={blobUrl}
+                                                                            alt="attachment"
+                                                                            className="img-fluid rounded shadow-sm"
+                                                                            style={{ maxWidth: '250px', maxHeight: '250px', objectFit: 'cover', cursor: 'pointer' }}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                // Open in new tab with blob URL
+                                                                                window.open(blobUrl, '_blank');
+                                                                            }}
+                                                                        />
+                                                                    ) : (
+                                                                        <div 
+                                                                            className="d-flex align-items-center justify-content-center bg-secondary bg-opacity-10 rounded"
+                                                                            style={{ width: '250px', height: '250px' }}
+                                                                        >
+                                                                            <div className="spinner-border text-danger" role="status">
+                                                                                <span className="visually-hidden">Loading image...</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                } else {
+                                                                    // Non-image file
+                                                                    return (
+                                                                        <button 
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleFileDownload(
+                                                                                    msg._id,
+                                                                                    msg.attachment.url,
+                                                                                    msg.attachment.fileName || msg.attachment.originalName || 'file'
+                                                                                );
+                                                                            }}
+                                                                            className={`btn btn-sm ${isUser ? 'btn-light' : 'btn-danger'} d-flex align-items-center gap-2`}
+                                                                            style={{ width: 'fit-content' }}
+                                                                        >
+                                                                            <i className="fa-solid fa-file"></i>
+                                                                            <span className="text-truncate" style={{ maxWidth: '150px' }}>
+                                                                                {msg.attachment.fileName || msg.attachment.originalName || 'File'}
+                                                                            </span>
+                                                                            <i className="fa-solid fa-download ms-1"></i>
+                                                                        </button>
+                                                                    );
+                                                                }
                                                             })()}
                                                         </div>
                                                     )}

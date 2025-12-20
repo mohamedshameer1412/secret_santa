@@ -106,15 +106,17 @@ const MessageSchema = new mongoose.Schema({
     // File/image attachment (encrypted)
     attachment: {
         type: {
-            encryptedUrl: String,  // Encrypted file path/URL
-            iv: String,
-            tag: String,
-            fileType: String,  // image, video, document, etc.
-            fileName: String,  // Original filename (encrypted)
-            fileSize: Number
+            encryptedFileId: String,    // Encrypted GridFS file ID
+            encryptedFileName: String,   // Encrypted original filename
+            ivFileId: String,           // IV for file ID encryption
+            ivFileName: String,         // IV for filename encryption
+            tagFileId: String,          // HMAC tag for file ID
+            tagFileName: String,        // HMAC tag for filename
+            fileType: String,           // 'image' or 'file'
+            size: Number                // File size in bytes
         },
         default: null
-    },
+    }, 
     // Edit history
     editHistory: [{
         encryptedText: String,
