@@ -5,6 +5,18 @@ const AuthContext = createContext();
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
+// Function to get a random avatar
+const getRandomAvatar = async () => {
+  try {
+    const response = await fetch('/avatars/avatars.json');
+    const avatars = await response.json();
+    const randomIndex = Math.floor(Math.random() * avatars.length);
+    return avatars[randomIndex].path;
+  } catch (error) {
+    console.error('Error loading avatars:', error);
+    return '/assets/santa-show.png'; // fallback
+  }
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -23,7 +35,11 @@ export const AuthProvider = ({ children }) => {
             }
             
             const response = await authService.getCurrentUser();
-            setUser(response.data.user ?? response.data);
+            const userData = response.data.user ?? response.data;
+            
+            // Assign a random avatar for this session
+            const randomAvatar = await getRandomAvatar();
+            setUser({ ...userData, profilePic: randomAvatar });
 
             setError(null);
         } catch (error) {
@@ -49,7 +65,11 @@ export const AuthProvider = ({ children }) => {
         if (data.token) {
             localStorage.setItem('token', data.token);
         }
-        setUser(data.user);
+        
+        // Assign a random avatar for this session
+        const randomAvatar = await getRandomAvatar();
+        setUser({ ...data.user, profilePic: randomAvatar });
+        
         return data;
     } catch (err) {
         setError(err.message);

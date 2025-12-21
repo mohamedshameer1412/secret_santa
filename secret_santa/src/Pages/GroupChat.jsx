@@ -64,7 +64,6 @@ const GroupChat = () => {
 
     const prevMessageCountRef = useRef(0);
     const initialScrollDone = useRef(false);
-    const avatarMapRef = useRef(new Map());
 
     const [imageUrls, setImageUrls] = useState({}); // Store blob URLs for images
     
@@ -250,13 +249,15 @@ const GroupChat = () => {
             // Use anonymous name if available (anonymous mode)
             const displayName = msg.anonymousName || msg.sender?.name || msg.sender?.username || 'Anonymous';
             
-            // Generate consistent random avatar per sender
+            // Use stored senderAvatar if available (persisted at message creation time)
+            // This ensures avatar doesn't change even if user updates their profile pic
             let avatarUrl;
-            if (!avatarMapRef.current.has(senderId)) {
-                avatarUrl = msg.sender?.profilePic || '/assets/santa2.png';
-                avatarMapRef.current.set(senderId, avatarUrl);
+            if (msg.sender?.profilePic) {
+                // Backend already overrides sender.profilePic with senderAvatar if it exists
+                avatarUrl = msg.sender.profilePic;
             } else {
-                avatarUrl = avatarMapRef.current.get(senderId);
+                // Fallback for messages without stored avatar (shouldn't happen with new messages)
+                avatarUrl = '/assets/santa2.png';
             }
             
             return {
@@ -267,7 +268,8 @@ const GroupChat = () => {
                     hour: '2-digit', 
                     minute: '2-digit' 
                 }),
-                img: avatarUrl, // Random avatar per anonymous user (consistent per sender)
+                createdAt: msg.createdAt, // Keep full date for separators
+                img: avatarUrl, // Use stored avatar picture (persisted at send time)
                 isCurrentUser,
                 isEdited: msg.isEdited,
                 isDeleted: msg.isDeleted,
@@ -295,21 +297,27 @@ const GroupChat = () => {
     useEffect(() => {
         if (!roomId || !user) return;
 
-        // Reset scroll state when room changes
-        initialScrollDone.current = false;
+        // Don't reset initialScrollDone when switching rooms
+        // It will only reset when component unmounts (leaving GroupChat)
 
         fetchRoomData();
         fetchMessages();
     }, [roomId, fetchRoomData, fetchMessages, user]);
 
+    // Scroll to bottom - smooth animation only on first load, instant after that
     useEffect(() => {
-        if (rawMessages.length > 0 && !initialScrollDone.current) {
+        if (rawMessages.length > 0) {
             // Use requestAnimationFrame to ensure DOM has updated
             requestAnimationFrame(() => {
                 setTimeout(() => {
-                    chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
-                    initialScrollDone.current = true;
-                }, 150); // Slightly longer delay to ensure render
+                    if (chatEndRef.current) {
+                        // First time: smooth scroll. After that: instant jump to bottom
+                        chatEndRef.current.scrollIntoView({ 
+                            behavior: initialScrollDone.current ? 'auto' : 'smooth' 
+                        });
+                        initialScrollDone.current = true;
+                    }
+                }, 100);
             });
         }
     }, [rawMessages]);
@@ -358,10 +366,13 @@ const GroupChat = () => {
                         timerProgressBar: true
                     });
                 } else {
-                    // Send new message
+                    // Send new message with current avatar
                     await axios.post(
                         `${API_URL}/${roomId}/message`,
-                        { text: message },
+                        { 
+                            text: message,
+                            currentAvatar: user.profilePic  // Send the currently displayed avatar
+                        },
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
                 }
@@ -429,6 +440,7 @@ const GroupChat = () => {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('text', `Shared a file: ${file.name}`);
+            formData.append('currentAvatar', user.profilePic || '/assets/santa2.png');  // Send current avatar
 
             const response = await axios.post(
                 `${API_URL}/${roomId}/upload`,

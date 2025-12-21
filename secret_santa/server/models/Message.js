@@ -96,6 +96,14 @@ const MessageSchema = new mongoose.Schema({
         type: String,
         required: true  // Keep required - clear old messages instead
     },
+    // Store anonymous name at message creation time
+    anonymousName: {
+        type: String
+    },
+    // Store sender's avatar at message creation time
+    senderAvatar: {
+        type: String
+    },
     // Reactions from users (anonymous names used)
     reactions: [{
         emoji: { type: String, required: true },

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Message = require('../models/Message');
 const ChatRoom = require('../models/ChatRoom');
+const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
@@ -258,9 +259,20 @@ router.get('/:roomId/messages', protect, asyncHandler(async (req, res) => {
                 text: Message.decryptText(msg.encryptedText, msg.iv, msg.tag)
             };
 
-            // Get anonymous name for sender
-            if (room.anonymousNames) {
+            // Use stored anonymous name if available, otherwise generate (for old messages)
+            if (msg.anonymousName) {
+                decrypted.anonymousName = msg.anonymousName;
+            } else if (room.anonymousNames) {
                 decrypted.anonymousName = room.anonymousNames.get(msg.sender._id.toString()) || 'Anonymous';
+            }
+
+            // Override sender profilePic with stored avatar if available
+            // IMPORTANT: Create a new sender object to avoid reference issues with .lean()
+            if (msg.senderAvatar && decrypted.sender) {
+                decrypted.sender = {
+                    ...decrypted.sender,
+                    profilePic: msg.senderAvatar
+                };
             }
 
             // Decrypt attachment if exists
@@ -322,8 +334,11 @@ router.get('/:roomId/messages', protect, asyncHandler(async (req, res) => {
 // @route   POST /api/chat/:roomId/message
 // @desc    Send a message to a chat room (encrypts before saving)
 // @access  Private
+// @note    Stores anonymousName and senderAvatar at message creation time to ensure
+//          they remain consistent even if user updates their profile or changes rooms.
+//          This provides a historical snapshot of the sender's identity at send time.
 router.post('/:roomId/message', protect, asyncHandler(async (req, res) => {
-    const { text } = req.body;
+    const { text, currentAvatar } = req.body;
 
     if (!text || !text.trim()) {
         throw new AppError('Message text is required', 400);
@@ -347,12 +362,21 @@ router.post('/:roomId/message', protect, asyncHandler(async (req, res) => {
     // Encrypt message with HMAC
     const { encryptedText, iv, tag } = Message.encryptText(text.trim());
 
+    // Get or generate anonymous name for this user in this room
+    const anonymousName = generateAnonymousName(room, req.user.id);
+
+    // Use the avatar passed from frontend (the one currently displayed)
+    // This allows for random/changing avatars while still persisting what was shown when sent
+    const avatarToStore = currentAvatar || '/assets/santa2.png';
+
     const message = await Message.create({
         roomId: req.params.roomId,
         sender: req.user.id,
         encryptedText,
         iv,
-        tag  // Store HMAC tag
+        tag,  // Store HMAC tag
+        anonymousName: room.anonymousMode ? anonymousName : null,
+        senderAvatar: avatarToStore  // Store the avatar that was displayed when sending
     });
 
     // Populate sender info
@@ -366,6 +390,20 @@ router.post('/:roomId/message', protect, asyncHandler(async (req, res) => {
         populatedMessage.iv,
         populatedMessage.tag
     );
+
+    // Use stored avatar instead of current profile pic
+    // Create new sender object to avoid reference issues
+    if (populatedMessage.senderAvatar && populatedMessage.sender) {
+        populatedMessage.sender = {
+            ...populatedMessage.sender,
+            profilePic: populatedMessage.senderAvatar
+        };
+    }
+
+    // Use stored anonymous name if in anonymous mode
+    if (populatedMessage.anonymousName) {
+        populatedMessage.anonymousName = populatedMessage.anonymousName;
+    }
 
     res.json({
         success: true,
@@ -394,7 +432,6 @@ router.post('/private-room', protect, asyncHandler(async (req, res) => {
 
     // If no room exists, create one
     if (!room) {
-        const User = require('../models/User');
         const otherUser = await User.findById(otherUserId);
         
         if (!otherUser) {
@@ -568,6 +605,15 @@ router.put('/:roomId/message/:messageId', protect, asyncHandler(async (req, res)
         populatedMessage.tag
     );
 
+    // Use stored avatar and anonymous name (preserve original values)
+    // Create new sender object to avoid reference issues
+    if (populatedMessage.senderAvatar && populatedMessage.sender) {
+        populatedMessage.sender = {
+            ...populatedMessage.sender,
+            profilePic: populatedMessage.senderAvatar
+        };
+    }
+
     res.json({
         success: true,
         message: populatedMessage
@@ -654,6 +700,9 @@ router.post('/:roomId/upload', protect, upload.single('file'), asyncHandler(asyn
     // Generate anonymous name if not already set
     const anonymousName = generateAnonymousName(room, req.user.id);
 
+    // Use the avatar from form data (the one currently displayed on frontend)
+    const avatarToStore = req.body.currentAvatar || '/assets/santa2.png';
+
     // Encrypt empty message text for file-only messages
     const emptyMessage = Message.encryptText('');
 
@@ -664,6 +713,8 @@ router.post('/:roomId/upload', protect, upload.single('file'), asyncHandler(asyn
         encryptedText: emptyMessage.encryptedText,
         iv: emptyMessage.iv,
         tag: emptyMessage.tag,
+        anonymousName: room.anonymousMode ? anonymousName : null,
+        senderAvatar: avatarToStore,  // Store the avatar displayed when uploading
         attachment: {
             encryptedFileId: encryptedFileId.encryptedText,
             encryptedFileName: encryptedFileName.encryptedText,
