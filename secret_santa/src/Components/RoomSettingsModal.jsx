@@ -8,7 +8,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
   const [loading, setLoading] = useState(true);
 
   const [roomData, setRoomData] = useState({
-    roomName: '',
+    name: '',
     description: '',
     maxParticipants: 10,
     drawDate: '',
@@ -27,12 +27,12 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.get(
-          `http://localhost:5000/api/room/${roomId}`,
+          `http://localhost:5000/api/chat/${roomId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         
         setRoomData({
-          roomName: response.data.roomName || '',
+          name: response.data.name || '',
           description: response.data.description || '',
           maxParticipants: response.data.maxParticipants || 10,
           drawDate: response.data.drawDate || '',
@@ -90,7 +90,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
     try {
       const token = localStorage.getItem('token');
       await axios.put(
-        `http://localhost:5000/api/room/${roomId}/settings`,
+        `http://localhost:5000/api/chat/${roomId}/settings`,
         roomData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -141,7 +141,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                   <i className="fas fa-cog me-3"></i>Room Settings
                 </h2>
                 <p className="modal-subtitle">
-                  {roomData.roomName || 'Configure your Secret Santa room preferences'}
+                  {roomData.name || 'Configure your Secret Santa room preferences'}
                 </p>
               </div>
 
@@ -188,9 +188,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                     <label className="form-label">Room Name</label>
                     <input
                       type="text"
-                      name="roomName"
+                      name="name"
                       className="form-control glass-input"
-                      value={roomData.roomName}
+                      value={roomData.name}
                       onChange={handleInputChange}
                       placeholder="e.g., Office Secret Santa 2024"
                     />

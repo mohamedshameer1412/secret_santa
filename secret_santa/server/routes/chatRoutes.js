@@ -82,7 +82,7 @@ function generateAnonymousName(room, userId) {
 }
 
 // @route   POST /api/chat/create-room
-// @desc    Create a new chat room
+// @desc    Create a new chat room (generic)
 // @access  Private
 router.post('/create-room', protect, asyncHandler(async (req, res) => {
     const { name } = req.body;
@@ -95,27 +95,88 @@ router.post('/create-room', protect, asyncHandler(async (req, res) => {
     });
 }));
 
+// @route   POST /api/chat/create
+// @desc    Create a Secret Santa room (with additional settings)
+// @access  Private
+router.post('/create', protect, asyncHandler(async (req, res) => {
+    const { roomName, name, description, maxParticipants, drawDate, giftBudget, theme, isPrivate, allowWishlist, allowChat } = req.body;
+    const adminId = req.user.id;
+
+    // Support both 'roomName' and 'name' for backward compatibility
+    const finalName = name || roomName;
+
+    // Validation
+    if (!finalName || finalName.trim().length === 0) {
+        throw new AppError('Room name is required', 400);
+    }
+
+    // Create room with admin as first participant
+    const room = await ChatRoom.createRoom({
+        name: finalName.trim(),
+        description: description?.trim(),
+        roomType: 'secret-santa',
+        maxParticipants: maxParticipants || 20,
+        drawDate,
+        giftBudget: giftBudget || 50,
+        theme: theme || 'christmas',
+        isPrivate: isPrivate || false,
+        allowWishlist: allowWishlist !== false, // Default true
+        allowChat: allowChat !== false // Default true
+    }, adminId);
+
+    res.status(201).json({
+        success: true,
+        message: 'Room created successfully',
+        room: {
+            _id: room._id,
+            name: room.name,
+            description: room.description,
+            organizer: room.organizer,
+            participants: room.participants,
+            maxParticipants: room.maxParticipants,
+            drawDate: room.drawDate,
+            giftBudget: room.giftBudget,
+            theme: room.theme,
+            inviteCode: room.inviteCode,
+            createdAt: room.createdAt
+        }
+    });
+}));
+
 // @route   GET /api/chat/my-rooms
 // @desc    Get all rooms for current user
 // @access  Private
 router.get('/my-rooms', protect, asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+
     const rooms = await ChatRoom.find({
-        participants: req.user.id
+        participants: userId
     })
-        .populate('organizer', 'name email username')
+        .populate('organizer', 'username profilePic email')
+        .select('name description organizer participants maxParticipants theme drawDate status roomType anonymousMode messages createdAt')
         .sort({ createdAt: -1 });
+
+    // Add isAdmin flag and other useful info for each room
+    const roomsWithMetadata = rooms.map(room => ({
+        _id: room._id,
+        name: room.name,
+        description: room.description,
+        organizer: room.organizer,
+        participantCount: room.participants.length,
+        maxParticipants: room.maxParticipants,
+        theme: room.theme,
+        drawDate: room.drawDate,
+        status: room.status,
+        roomType: room.roomType,
+        anonymousMode: room.anonymousMode,
+        messageCount: room.messages ? room.messages.length : 0,
+        createdAt: room.createdAt,
+        isAdmin: room.organizer._id.toString() === userId
+    }));
 
     res.json({
         success: true,
-        rooms: rooms.map(room => ({
-            _id: room._id,
-            name: room.name,
-            anonymousMode: room.anonymousMode,
-            organizer: room.organizer,
-            participantCount: room.participants.length,
-            messageCount: room.messages ? room.messages.length : 0,
-            createdAt: room.createdAt
-        }))
+        rooms: roomsWithMetadata
     });
 }));
 
@@ -123,26 +184,46 @@ router.get('/my-rooms', protect, asyncHandler(async (req, res) => {
 // @desc    Get specific room by ID
 // @access  Private
 router.get('/:roomId', protect, asyncHandler(async (req, res) => {
-    const room = await ChatRoom.findById(req.params.roomId)
-        .populate('organizer', 'name email username')
-        .populate('participants', 'name email username profilePic');
+    const { roomId } = req.params;
+    const userId = req.user.id;
+
+    const room = await ChatRoom.getRoomWithDetails(roomId);
 
     if (!room) {
         throw new AppError('Room not found', 404);
     }
 
     // Check if user is participant
-    const isParticipant = room.participants.some(
-        p => p._id.toString() === req.user.id
-    );
-
+    const isParticipant = room.participants.some(p => p._id.toString() === userId);
     if (!isParticipant) {
-        throw new AppError('You are not a participant in this room', 403);
+        throw new AppError('You do not have access to this room', 403);
     }
 
     res.json({
         success: true,
-        room
+        room: {
+            _id: room._id,
+            name: room.name,
+            description: room.description,
+            organizer: room.organizer,
+            participants: room.participants,
+            maxParticipants: room.maxParticipants,
+            drawDate: room.drawDate,
+            giftBudget: room.giftBudget,
+            theme: room.theme,
+            status: room.status,
+            roomType: room.roomType,
+            isPrivate: room.isPrivate,
+            allowWishlist: room.allowWishlist,
+            allowChat: room.allowChat,
+            anonymousMode: room.anonymousMode,
+            inviteCode: room.inviteCode,
+            pairings: room.pairings,
+            chatRoom: room.chatRoom,
+            createdAt: room.createdAt,
+            updatedAt: room.updatedAt,
+            isAdmin: room.organizer._id.toString() === userId
+        }
     });
 }));
 
@@ -728,6 +809,164 @@ router.post('/:roomId/message/:messageId/reaction', protect, asyncHandler(async 
             anonymousName: r.anonymousName,
             isCurrentUser: r.userId.toString() === req.user.id
         }))
+    });
+}));
+
+// ======================== ROOM MANAGEMENT ROUTES ========================
+
+// @route   PUT /api/chat/:roomId/settings
+// @desc    Update room settings (admin only)
+// @access  Private
+router.put('/:roomId/settings', protect, asyncHandler(async (req, res) => {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+    const { name, description, maxParticipants, drawDate, giftBudget, theme, isPrivate, allowWishlist, allowChat } = req.body;
+
+    const room = await ChatRoom.findById(roomId);
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is admin
+    if (room.organizer.toString() !== userId) {
+        throw new AppError('Only room admin can update settings', 403);
+    }
+
+    // Update fields
+    if (name) room.name = name.trim();
+    if (description !== undefined) room.description = description?.trim();
+    if (maxParticipants !== undefined) {
+        // Ensure maxParticipants is not less than current participants
+        if (maxParticipants < room.participants.length) {
+            throw new AppError(`Cannot set max participants below current participant count (${room.participants.length})`, 400);
+        }
+        room.maxParticipants = maxParticipants;
+    }
+    if (drawDate !== undefined) room.drawDate = drawDate;
+    if (giftBudget !== undefined) room.giftBudget = giftBudget;
+    if (theme) room.theme = theme;
+    if (isPrivate !== undefined) room.isPrivate = isPrivate;
+    if (allowWishlist !== undefined) room.allowWishlist = allowWishlist;
+    if (allowChat !== undefined) room.allowChat = allowChat;
+
+    await room.save();
+
+    res.json({
+        success: true,
+        message: 'Room settings updated successfully',
+        room: {
+            _id: room._id,
+            name: room.name,
+            description: room.description,
+            maxParticipants: room.maxParticipants,
+            drawDate: room.drawDate,
+            giftBudget: room.giftBudget,
+            theme: room.theme,
+            isPrivate: room.isPrivate,
+            allowWishlist: room.allowWishlist,
+            allowChat: room.allowChat,
+            updatedAt: room.updatedAt
+        }
+    });
+}));
+
+// @route   DELETE /api/chat/:roomId
+// @desc    Delete room (admin only)
+// @access  Private
+router.delete('/:roomId', protect, asyncHandler(async (req, res) => {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+
+    const room = await ChatRoom.findById(roomId);
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is admin
+    if (room.organizer.toString() !== userId) {
+        throw new AppError('Only room admin can delete the room', 403);
+    }
+
+    await ChatRoom.findByIdAndDelete(roomId);
+
+    res.json({
+        success: true,
+        message: 'Room deleted successfully'
+    });
+}));
+
+// @route   DELETE /api/chat/:roomId/participants/:userId
+// @desc    Remove participant from room (admin only)
+// @access  Private
+router.delete('/:roomId/participants/:userId', protect, asyncHandler(async (req, res) => {
+    const { roomId, userId: targetUserId } = req.params;
+    const adminId = req.user.id;
+
+    const room = await ChatRoom.findById(roomId);
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is admin
+    if (room.organizer.toString() !== adminId) {
+        throw new AppError('Only room admin can remove participants', 403);
+    }
+
+    // Cannot remove admin
+    if (targetUserId === adminId) {
+        throw new AppError('Admin cannot be removed from the room', 400);
+    }
+
+    // Check if user is actually a participant
+    const participantIndex = room.participants.findIndex(p => p.toString() === targetUserId);
+    if (participantIndex === -1) {
+        throw new AppError('User is not a participant in this room', 404);
+    }
+
+    // Remove participant
+    room.participants.splice(participantIndex, 1);
+    await room.save();
+
+    res.json({
+        success: true,
+        message: 'Participant removed successfully'
+    });
+}));
+
+// @route   POST /api/chat/:roomId/leave
+// @desc    Leave room (participant only, not admin)
+// @access  Private
+router.post('/:roomId/leave', protect, asyncHandler(async (req, res) => {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+
+    const room = await ChatRoom.findById(roomId);
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is admin
+    if (room.organizer.toString() === userId) {
+        throw new AppError('Admin cannot leave the room. Transfer admin rights or delete the room instead.', 400);
+    }
+
+    // Check if user is participant
+    const participantIndex = room.participants.findIndex(p => p.toString() === userId);
+    if (participantIndex === -1) {
+        throw new AppError('You are not a participant in this room', 404);
+    }
+
+    // Remove participant
+    room.participants.splice(participantIndex, 1);
+    await room.save();
+
+    res.json({
+        success: true,
+        message: 'Successfully left the room'
     });
 }));
 

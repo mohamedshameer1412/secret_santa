@@ -34,7 +34,7 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.get(
-          'http://localhost:5000/api/room/my-rooms',
+          'http://localhost:5000/api/chat/my-rooms',
           { headers: { Authorization: `Bearer ${token}` } }
         );
         
@@ -42,7 +42,7 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
         const dummyRooms = [
           {
             _id: 'room1',
-            roomName: 'Office Secret Santa 2024',
+            name: 'Office Secret Santa 2024',
             description: 'Annual office gift exchange',
             participantCount: 12,
             maxParticipants: 20,
@@ -52,7 +52,7 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
           },
           {
             _id: 'room2',
-            roomName: 'Family Christmas',
+            name: 'Family Christmas',
             description: 'Family holiday celebration',
             participantCount: 8,
             maxParticipants: 15,
@@ -62,7 +62,7 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
           },
           {
             _id: 'room3',
-            roomName: 'Friends Gift Swap',
+            name: 'Friends Gift Swap',
             description: 'Annual friends gathering',
             participantCount: 6,
             maxParticipants: 10,
@@ -79,7 +79,7 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
         setRooms([
           {
             _id: 'room1',
-            roomName: 'Office Secret Santa 2024',
+            name: 'Office Secret Santa 2024',
             description: 'Annual office gift exchange',
             participantCount: 12,
             maxParticipants: 20,
@@ -168,7 +168,7 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
                   )}
 
                   {/* Room Info */}
-                  <h5 className="room-name">{room.roomName}</h5>
+                  <h5 className="room-name">{room.name}</h5>
                   <p className="room-description">{room.description}</p>
 
                   <div className="room-stats">

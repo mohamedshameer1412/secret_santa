@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Room = require('../models/Room');
+const ChatRoom = require('../models/ChatRoom');
 const { protect } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
@@ -14,14 +14,14 @@ function generateInviteCode() {
 // Generate/Get Invite Link for a Room
 router.get('/room/:roomId/invite', protect, asyncHandler(async (req, res) => {
   const { roomId } = req.params;
-  const room = await Room.findById(roomId);
+  const room = await ChatRoom.findById(roomId);
 
   if (!room) {
     throw new AppError('Room not found', 404);
   }
 
   // Check if user is admin
-  if (room.admin.toString() !== req.user.id) {
+  if (room.organizer.toString() !== req.user.id) {
     throw new AppError('Only room admin can generate invite links', 403);
   }
 
@@ -37,16 +37,16 @@ router.get('/room/:roomId/invite', protect, asyncHandler(async (req, res) => {
     success: true,
     inviteCode: room.inviteCode,
     inviteLink: inviteLink,
-    roomName: room.roomName
+    name: room.name
   });
 }));
 
 // Get Room Info by Invite Code (for preview before joining)
 router.get('/join/:inviteCode', asyncHandler(async (req, res) => {
   const { inviteCode } = req.params;
-  const room = await Room.findOne({ inviteCode })
-    .populate('admin', 'username')
-    .select('roomName description admin participants maxParticipants theme drawDate');
+  const room = await ChatRoom.findOne({ inviteCode })
+    .populate('organizer', 'username')
+    .select('name description organizer participants maxParticipants theme drawDate');
 
   if (!room) {
     throw new AppError('Invalid invite link', 404);
@@ -56,9 +56,9 @@ router.get('/join/:inviteCode', asyncHandler(async (req, res) => {
     success: true,
     room: {
       _id: room._id,
-      roomName: room.roomName,
+      name: room.name,
       description: room.description,
-      admin: room.admin.username,
+      organizer: room.organizer.username,
       participantCount: room.participants.length,
       maxParticipants: room.maxParticipants,
       theme: room.theme,
@@ -72,7 +72,7 @@ router.post('/join/:inviteCode', protect, asyncHandler(async (req, res) => {
   const { inviteCode } = req.params;
   const userId = req.user.id;
 
-  const room = await Room.findOne({ inviteCode });
+  const room = await ChatRoom.findOne({ inviteCode });
 
   if (!room) {
     throw new AppError('Invalid invite link', 404);
@@ -97,7 +97,7 @@ router.post('/join/:inviteCode', protect, asyncHandler(async (req, res) => {
     message: 'Successfully joined the room!',
     room: {
       _id: room._id,
-      roomName: room.roomName,
+      name: room.name,
       description: room.description
     }
   });
@@ -106,14 +106,14 @@ router.post('/join/:inviteCode', protect, asyncHandler(async (req, res) => {
 // Regenerate Invite Code (invalidates old link)
 router.post('/room/:roomId/invite/regenerate', protect, asyncHandler(async (req, res) => {
   const { roomId } = req.params;
-  const room = await Room.findById(roomId);
+  const room = await ChatRoom.findById(roomId);
 
   if (!room) {
     throw new AppError('Room not found', 404);
   }
 
   // Check if user is admin
-  if (room.admin.toString() !== req.user.id) {
+  if (room.organizer.toString() !== req.user.id) {
     throw new AppError('Only room admin can regenerate invite links', 403);
   }
 
