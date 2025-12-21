@@ -378,6 +378,10 @@
   margin-bottom: 0.25rem;
 }
 
+.form-check-label p {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
 /* Review Section */
 .review-section {
   display: flex;
