@@ -499,7 +499,7 @@ const GroupChat = () => {
             formData.append('text', `Shared a file: ${file.name}`);
             formData.append('currentAvatar', user.profilePic || '/assets/santa2.png');  // Send current avatar
 
-            const response = await axios.post(
+            await axios.post(
                 `${API_URL}/${roomId}/upload`,
                 formData,
                 {

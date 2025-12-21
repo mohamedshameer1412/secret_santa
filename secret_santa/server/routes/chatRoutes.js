@@ -176,6 +176,16 @@ router.post(
 			adminId
 		);
 
+		// Generate invite code automatically for new rooms
+		if (!room.inviteCode) {
+			const crypto = require("crypto");
+			room.inviteCode = `SANTA-${crypto
+				.randomBytes(4)
+				.toString("hex")
+				.toUpperCase()}`;
+			await room.save();
+		}
+
 		res.status(201).json({
 			success: true,
 			message: "Room created successfully",
@@ -1281,30 +1291,97 @@ router.post(
 			await room.save();
 		}
 
-		// In a real application, you would send emails here
-		// For now, we'll just log the invitation details
+		// Send email invitations
+		const { sendEmail } = require("../utils/sendEmail");
 		const inviteLink = `${
 			process.env.FRONTEND_URL || "http://localhost:5173"
 		}/join/${room.inviteCode}`;
 
-		console.log("Sending invitations to:", emails);
-		console.log("Invite link:", inviteLink);
-		console.log("Custom message:", customMessage);
+		const emailsSent = [];
+		const emailsFailed = [];
 
-		// TODO: Implement actual email sending with sendEmail utility
-		// const sendEmail = require('../utils/sendEmail');
-		// for (const email of emails) {
-		//     await sendEmail({
-		//         to: email,
-		//         subject: `You're invited to join ${room.name}!`,
-		//         text: `${room.organizer.username} has invited you to join their Secret Santa room "${room.name}".\n\n${customMessage || ''}\n\nInvite Code: ${room.inviteCode}\nJoin here: ${inviteLink}`
-		//     });
-		// }
+		for (const email of emails) {
+			try {
+				const emailHtml = `
+					<!DOCTYPE html>
+					<html>
+					<head>
+						<style>
+							body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
+							.container { max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+							.header { background: linear-gradient(135deg, #2d5016 0%, #4a7c2a 100%); padding: 30px; text-align: center; }
+							.header h1 { color: white; margin: 0; font-size: 28px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+							.header .icon { font-size: 48px; margin-bottom: 10px; }
+							.content { padding: 30px; }
+							.message { background: #f9f9f9; padding: 20px; border-left: 4px solid #2d5016; margin: 20px 0; border-radius: 5px; }
+							.code-box { background: #1a1a2e; color: #ffd700; padding: 20px; text-align: center; border-radius: 10px; margin: 20px 0; font-size: 24px; font-weight: bold; letter-spacing: 3px; font-family: 'Courier New', monospace; }
+							.button { display: inline-block; background: linear-gradient(135deg, #2d5016 0%, #4a7c2a 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 20px 0; box-shadow: 0 4px 10px rgba(45, 80, 22, 0.3); }
+							.button:hover { box-shadow: 0 6px 15px rgba(45, 80, 22, 0.5); }
+							.footer { background: #f4f4f4; padding: 20px; text-align: center; color: #666; font-size: 12px; }
+							.festive { color: #cc0000; }
+						</style>
+					</head>
+					<body>
+						<div class="container">
+							<div class="header">
+								<div class="icon">🎁</div>
+								<h1>Secret Santa Invitation!</h1>
+							</div>
+							<div class="content">
+								<p>Ho ho ho! 🎅</p>
+								<p><strong>${
+									room.organizer.username
+								}</strong> has invited you to join their Secret Santa room:</p>
+								<h2 style="color: #2d5016; text-align: center; margin: 20px 0;">${
+									room.name
+								}</h2>
+								${
+									customMessage
+										? `<div class="message"><p><strong>Personal Message:</strong></p><p>${customMessage}</p></div>`
+										: ""
+								}
+								<p style="text-align: center; margin: 20px 0;">Use this invite code to join:</p>
+								<div class="code-box">${room.inviteCode}</div>
+								<p style="text-align: center;">Or click the button below to join directly:</p>
+								<div style="text-align: center;">
+									<a href="${inviteLink}" class="button">🎄 Join Room Now</a>
+								</div>
+								<p style="margin-top: 30px; color: #666; font-size: 14px;">
+									If the button doesn't work, copy and paste this link into your browser:<br>
+									<a href="${inviteLink}" style="color: #2d5016; word-break: break-all;">${inviteLink}</a>
+								</p>
+							</div>
+							<div class="footer">
+								<p class="festive">🎄 Happy Secret Santa! 🎅</p>
+								<p>This is an automated invitation from Secret Santa App</p>
+							</div>
+						</div>
+					</body>
+					</html>
+				`;
+
+				await sendEmail(
+					email,
+					`🎁 You're invited to join ${room.name}!`,
+					emailHtml
+				);
+				emailsSent.push(email);
+			} catch (error) {
+				console.error(`Failed to send email to ${email}:`, error);
+				emailsFailed.push(email);
+			}
+		}
 
 		res.json({
 			success: true,
-			message: `Invitations sent to ${emails.length} email(s)`,
+			message: `Invitations sent successfully to ${emailsSent.length} email(s)${
+				emailsFailed.length > 0
+					? `. Failed to send to ${emailsFailed.length} email(s)`
+					: ""
+			}`,
 			inviteCode: room.inviteCode,
+			emailsSent,
+			emailsFailed,
 		});
 	})
 );
@@ -1327,8 +1404,8 @@ router.get(
 			throw new AppError("Invalid invite code", 404);
 		}
 
-		// Don't show inactive rooms
-		if (room.status !== "active") {
+		// Don't show completed rooms
+		if (room.status === "completed") {
 			throw new AppError("This room is no longer active", 403);
 		}
 

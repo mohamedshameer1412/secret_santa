@@ -311,15 +311,21 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 
-			Swal.fire({
+			// Show success message
+			await Swal.fire({
 				icon: "success",
 				title: "Room Deleted",
 				text: "The room has been permanently deleted.",
 				confirmButtonColor: "#2d5016",
 			});
 
-			// Stay in GroupChats section
-			window.location.href = "/group-chat";
+			// Stay on current page - detect if we're on dashboard or group-chat
+			const currentPath = window.location.pathname;
+			if (currentPath.includes("/dashboard")) {
+				window.location.href = "/dashboard";
+			} else {
+				window.location.href = "/group-chat";
+			}
 		} catch (error) {
 			Swal.fire({
 				icon: "error",

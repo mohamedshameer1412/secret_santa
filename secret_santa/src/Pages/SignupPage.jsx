@@ -30,7 +30,7 @@ const SignupPage = () => {
                 password: password
             };
                         
-            const result = await authService.register(registrationData);
+            await authService.register(registrationData);
             
             alert('Registration successful! Please check your email to verify your account.');
             navigate('/login');
