@@ -67,6 +67,10 @@ const roomSchema = new mongoose.Schema({
     unique: true,
     sparse: true // Allows multiple null values, but unique non-null values
   },
+  allowAnyoneInvite: {
+    type: Boolean,
+    default: false  // Default: only organizer can generate invite links
+  },
   maxParticipants: {
     type: Number,
     default: 20,

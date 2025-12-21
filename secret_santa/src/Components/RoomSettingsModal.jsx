@@ -25,6 +25,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
     isPrivate: false,
     allowWishlist: true,
     allowChat: true,
+    allowAnyoneInvite: false,
     theme: 'christmas',
     anonymousMode: true,
     organizer: null
@@ -32,19 +33,28 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 
   useEffect(() => {
     const fetchRoomData = async () => {
-      if (!isOpen || !roomId) return;
+      console.log('🔍 fetchRoomData called - isOpen:', isOpen, 'roomId:', roomId);
+      if (!isOpen || !roomId) {
+        console.log('❌ Fetch aborted - isOpen:', isOpen, 'roomId:', roomId);
+        return;
+      }
       
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
+        console.log('📡 Fetching room data for roomId:', roomId);
         const response = await axios.get(
           `http://localhost:5000/api/chat/${roomId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         
-        const room = response.data;
+        console.log('✅ Room data fetched:', response.data);
+        // Backend returns {success: true, room: {...}}
+        const room = response.data.room || response.data;
+        console.log('📦 Extracted room object:', room);
         const organizerId = room.organizer?._id || room.organizer;
         const userIsOrganizer = organizerId === user?.id;
+        console.log('👑 organizerId:', organizerId, 'user.id:', user?.id, 'isOrganizer:', userIsOrganizer);
         
         setIsOrganizer(userIsOrganizer);
         setParticipants(room.participants || []);
@@ -59,15 +69,19 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
           isPrivate: room.isPrivate || false,
           allowWishlist: room.allowWishlist !== false,
           allowChat: room.allowChat !== false,
+          allowAnyoneInvite: room.allowAnyoneInvite || false,
           theme: room.theme || 'christmas',
           anonymousMode: room.anonymousMode !== false,
           organizer: room.organizer
         });
+        console.log('✅ Room data state updated successfully');
       } catch (error) {
-        console.error('Error fetching room data:', error);
-        alert('Failed to load room settings');
+        console.error('❌ Error fetching room data:', error);
+        console.error('Error details:', error.response?.data);
+        alert('Failed to load room settings: ' + (error.response?.data?.message || error.message));
       } finally {
         setLoading(false);
+        console.log('🏁 Loading state set to false');
       }
     };
 
@@ -228,16 +242,70 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
     onClose();
   };
 
-  if (!isOpen) return null;
+  console.log('🎨 RoomSettingsModal render - isOpen:', isOpen, 'loading:', loading, 'roomId:', roomId);
+  console.log('📊 roomData:', roomData);
+  console.log('👥 participants:', participants.length, 'isOrganizer:', isOrganizer);
+  console.log('🔖 activeTab:', activeTab);
+
+  if (!isOpen) {
+    console.log('❌ Modal closed - returning null');
+    return null;
+  }
+
+  console.log('✅ Modal SHOULD BE VISIBLE NOW - rendering JSX');
 
   return (
     <>
       {/* Backdrop with blur */}
-      <div className="room-settings-modal-backdrop" onClick={handleClose}></div>
+      <div 
+        className="room-settings-modal-backdrop" 
+        onClick={handleClose}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          zIndex: 9998,
+          visibility: 'visible',
+          display: 'block'
+        }}
+      ></div>
 
       {/* Modal Container */}
-      <div className="room-settings-modal-container">
-        <div className="room-settings-modal-content">
+      <div 
+        className="room-settings-modal-container"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem',
+          visibility: 'visible'
+        }}
+      >
+        <div 
+          className="room-settings-modal-content"
+          style={{
+            background: 'rgba(15, 25, 35, 0.98)',
+            border: '2px solid rgba(255, 215, 0, 0.2)',
+            borderRadius: '24px',
+            maxWidth: '950px',
+            width: '100%',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+            overflow: 'hidden',
+            visibility: 'visible'
+          }}
+        >
           
           {/* Close Button */}
           <button className="room-settings-modal-close" onClick={handleClose}>
@@ -255,26 +323,30 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
           ) : (
             <>
               {/* Modal Header */}
-              <div className="modal-header-section">
-                <h2 className="modal-title">
+              <div className="modal-header-section" style={{ visibility: 'visible', background: 'rgba(0,255,0,0.1)', padding: '20px', color: '#fff' }}>
+                {console.log('🎪 Rendering modal header')}
+                <h2 className="modal-title" style={{ color: '#FFD700', fontSize: '2rem', fontWeight: 'bold' }}>
                   <i className="fas fa-cog me-3"></i>Room Settings
                 </h2>
-                <p className="modal-subtitle">
+                <p className="modal-subtitle" style={{ color: '#fff', fontSize: '1rem' }}>
                   {roomData.name || 'Configure your Secret Santa room preferences'}
                 </p>
               </div>
 
           {/* Tabs Navigation */}
-          <div className="tabs-navigation">
+          <div className="tabs-navigation" style={{ display: 'flex', visibility: 'visible', padding: '10px', gap: '10px', flexWrap: 'wrap' }}>
+            {console.log('🔥 Rendering tabs navigation')}
             <button
               className={`tab-btn ${activeTab === 'general' ? 'active' : ''}`}
               onClick={() => setActiveTab('general')}
+              style={{ background: '#FFD700', color: '#000', padding: '10px 20px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               <i className="fas fa-info-circle me-2"></i>General
             </button>
             <button
               className={`tab-btn ${activeTab === 'participants' ? 'active' : ''}`}
               onClick={() => setActiveTab('participants')}
+              style={{ background: '#FFD700', color: '#000', padding: '10px 20px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               <i className="fas fa-users me-2"></i>Participants
             </button>
@@ -282,6 +354,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
               <button
                 className={`tab-btn ${activeTab === 'management' ? 'active' : ''}`}
                 onClick={() => setActiveTab('management')}
+                style={{ background: '#FFD700', color: '#000', padding: '10px 20px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 <i className="fas fa-crown me-2"></i>Management
               </button>
@@ -289,30 +362,34 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
             <button
               className={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`}
               onClick={() => setActiveTab('rules')}
+              style={{ background: '#FFD700', color: '#000', padding: '10px 20px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               <i className="fas fa-gavel me-2"></i>Rules
             </button>
             <button
               className={`tab-btn ${activeTab === 'advanced' ? 'active' : ''}`}
               onClick={() => setActiveTab('advanced')}
+              style={{ background: '#FFD700', color: '#000', padding: '10px 20px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               <i className="fas fa-sliders-h me-2"></i>Advanced
             </button>
           </div>
 
           {/* Tab Content */}
-          <div className="tab-content">
+          <div className="tab-content" style={{ padding: '20px', background: '#1a1a2e', minHeight: '400px', overflow: 'auto' }}>
+            {console.log('🎯 Rendering tab-content, activeTab =', activeTab, 'checking if === "general":', activeTab === 'general')}
             
             {/* General Tab */}
             {activeTab === 'general' && (
-              <div className="tab-pane">
-                <div className="glass-card">
-                  <h5 className="section-title">
+              <div className="tab-pane" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                {console.log('✅ INSIDE General tab-pane - THIS SHOULD RENDER')}
+                <div className="glass-card" style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '10px', border: '2px solid #FFD700' }}>
+                  <h5 className="section-title" style={{ color: '#FFD700', fontSize: '1.5rem', marginBottom: '20px' }}>
                     <i className="fas fa-info-circle me-2"></i>Basic Information
                   </h5>
 
                   <div className="form-group mb-3">
-                    <label className="form-label">Room Name</label>
+                    <label className="form-label" style={{ color: '#fff', display: 'block', marginBottom: '10px', fontSize: '1rem' }}>Room Name</label>
                     <input
                       type="text"
                       name="name"
@@ -365,17 +442,18 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                   </div>
 
                   <div className="form-group mb-3">
-                    <label className="form-label">Theme</label>
+                    <label className="form-label" style={{ color: '#fff', display: 'block', marginBottom: '10px' }}>Theme</label>
                     <select
                       name="theme"
                       className="form-control glass-input"
                       value={roomData.theme}
                       onChange={handleInputChange}
+                      style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,215,0,0.3)', padding: '10px', borderRadius: '8px' }}
                     >
-                      <option value="christmas">🎄 Christmas</option>
-                      <option value="winter">❄️ Winter Wonderland</option>
-                      <option value="festive">🎉 Festive</option>
-                      <option value="elegant">✨ Elegant</option>
+                      <option value="christmas" style={{ background: '#1a1a2e', color: '#fff' }}>🎄 Christmas</option>
+                      <option value="winter" style={{ background: '#1a1a2e', color: '#fff' }}>❄️ Winter Wonderland</option>
+                      <option value="festive" style={{ background: '#1a1a2e', color: '#fff' }}>🎉 Festive</option>
+                      <option value="elegant" style={{ background: '#1a1a2e', color: '#fff' }}>✨ Elegant</option>
                     </select>
                   </div>
                 </div>
@@ -384,9 +462,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 
             {/* Participants Tab */}
             {activeTab === 'participants' && (
-              <div className="tab-pane">
-                <div className="glass-card">
-                  <h5 className="section-title">
+              <div className="tab-pane" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                <div className="glass-card" style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '10px', border: '2px solid #FFD700' }}>
+                  <h5 className="section-title" style={{ color: '#FFD700', fontSize: '1.5rem', marginBottom: '20px' }}>
                     <i className="fas fa-users me-2"></i>Participant Settings
                   </h5>
 
@@ -424,7 +502,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                       <h6 className="mb-0">
                         Current Participants ({participants.length}/{roomData.maxParticipants})
                       </h6>
-                      {isOrganizer && (
+                      {(isOrganizer || roomData.allowAnyoneInvite) && (
                         <button 
                           className="btn btn-invite btn-sm"
                           onClick={() => setIsInviteModalOpen(true)}
@@ -438,7 +516,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                       <div className="empty-state">
                         <i className="fas fa-user-plus fa-3x mb-3 text-muted"></i>
                         <p className="text-muted">No participants yet. Share the room link to invite people!</p>
-                        {isOrganizer && (
+                        {(isOrganizer || roomData.allowAnyoneInvite) && (
                           <button 
                             className="btn btn-invite mt-2"
                             onClick={() => setIsInviteModalOpen(true)}
@@ -476,9 +554,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 
             {/* Management Tab - Organizer Only */}
             {activeTab === 'management' && isOrganizer && (
-              <div className="tab-pane">
-                <div className="glass-card">
-                  <h5 className="section-title">
+              <div className="tab-pane" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                <div className="glass-card" style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '10px', border: '2px solid #FFD700' }}>
+                  <h5 className="section-title" style={{ color: '#FFD700', fontSize: '1.5rem', marginBottom: '20px' }}>
                     <i className="fas fa-crown me-2"></i>Organizer Controls
                   </h5>
                   <p className="text-muted mb-4">
@@ -586,9 +664,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 
             {/* Rules Tab */}
             {activeTab === 'rules' && (
-              <div className="tab-pane">
-                <div className="glass-card">
-                  <h5 className="section-title">
+              <div className="tab-pane" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                <div className="glass-card" style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '10px', border: '2px solid #FFD700' }}>
+                  <h5 className="section-title" style={{ color: '#FFD700', fontSize: '1.5rem', marginBottom: '20px' }}>
                     <i className="fas fa-gavel me-2"></i>Room Rules & Privacy
                   </h5>
 
@@ -653,6 +731,46 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                     </label>
                   </div>
 
+                  {/* Invite Permissions Section */}
+                  <div className="invite-permissions-section mb-4">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <div>
+                        <strong className="text-white d-block mb-1">
+                          <i className="fas fa-link me-2"></i>Invite Link Permissions
+                        </strong>
+                        <small className="text-muted">
+                          {isOrganizer ? 'Control who can generate invite links' : 'Current invite permissions'}
+                        </small>
+                      </div>
+                      <div className="form-check form-switch">
+                        <input
+                          className="form-check-input form-check-input-lg"
+                          type="checkbox"
+                          id="allowAnyoneInvite"
+                          name="allowAnyoneInvite"
+                          checked={roomData.allowAnyoneInvite}
+                          onChange={handleInputChange}
+                          disabled={!isOrganizer}
+                          style={{ cursor: isOrganizer ? 'pointer' : 'not-allowed' }}
+                        />
+                        <label className="form-check-label" htmlFor="allowAnyoneInvite">
+                          {roomData.allowAnyoneInvite ? 'Anyone can invite' : 'Organizer only'}
+                        </label>
+                      </div>
+                    </div>
+                    {roomData.allowAnyoneInvite ? (
+                      <div className="alert alert-info glass-alert-info">
+                        <i className="fas fa-info-circle me-2"></i>
+                        All participants can generate and share invite links to add new members.
+                      </div>
+                    ) : (
+                      <div className="alert alert-warning glass-alert-info" style={{background: 'rgba(255, 193, 7, 0.2)', borderColor: 'rgba(255, 193, 7, 0.5)'}}>
+                        <i className="fas fa-lock me-2"></i>
+                        Only the organizer can generate invite links for this room.
+                      </div>
+                    )}
+                  </div>
+
                   <div className="rules-info">
                     <h6 className="mb-3">Default Rules:</h6>
                     <ul className="rules-list">
@@ -668,9 +786,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 
             {/* Advanced Tab */}
             {activeTab === 'advanced' && (
-              <div className="tab-pane">
-                <div className="glass-card">
-                  <h5 className="section-title">
+              <div className="tab-pane" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                <div className="glass-card" style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '10px', border: '2px solid #FFD700' }}>
+                  <h5 className="section-title" style={{ color: '#FFD700', fontSize: '1.5rem', marginBottom: '20px' }}>
                     <i className="fas fa-sliders-h me-2"></i>Advanced Settings
                   </h5>
 
@@ -727,7 +845,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
               )}
             </button>
           </div>
-        </>
+            </>
           )}
         </div>
       </div>

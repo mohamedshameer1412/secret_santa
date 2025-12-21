@@ -241,6 +241,7 @@ router.get('/:roomId', protect, asyncHandler(async (req, res) => {
             isPrivate: room.isPrivate,
             allowWishlist: room.allowWishlist,
             allowChat: room.allowChat,
+            allowAnyoneInvite: room.allowAnyoneInvite,
             anonymousMode: room.anonymousMode,
             inviteCode: room.inviteCode,
             pairings: room.pairings,
@@ -895,7 +896,7 @@ router.post('/:roomId/message/:messageId/reaction', protect, asyncHandler(async 
 router.put('/:roomId/settings', protect, asyncHandler(async (req, res) => {
     const { roomId } = req.params;
     const userId = req.user.id;
-    const { name, description, maxParticipants, drawDate, giftBudget, theme, isPrivate, allowWishlist, allowChat } = req.body;
+    const { name, description, maxParticipants, drawDate, giftBudget, theme, isPrivate, allowWishlist, allowChat, allowAnyoneInvite, anonymousMode } = req.body;
 
     const room = await ChatRoom.findById(roomId);
 
@@ -924,6 +925,8 @@ router.put('/:roomId/settings', protect, asyncHandler(async (req, res) => {
     if (isPrivate !== undefined) room.isPrivate = isPrivate;
     if (allowWishlist !== undefined) room.allowWishlist = allowWishlist;
     if (allowChat !== undefined) room.allowChat = allowChat;
+    if (allowAnyoneInvite !== undefined) room.allowAnyoneInvite = allowAnyoneInvite;
+    if (anonymousMode !== undefined) room.anonymousMode = anonymousMode;
 
     await room.save();
 
@@ -941,6 +944,8 @@ router.put('/:roomId/settings', protect, asyncHandler(async (req, res) => {
             isPrivate: room.isPrivate,
             allowWishlist: room.allowWishlist,
             allowChat: room.allowChat,
+            allowAnyoneInvite: room.allowAnyoneInvite,
+            anonymousMode: room.anonymousMode,
             updatedAt: room.updatedAt
         }
     });
@@ -1018,6 +1023,12 @@ router.get('/:roomId/invite-code', protect, asyncHandler(async (req, res) => {
     const isParticipant = room.participants.some(p => p.toString() === userId);
     if (!isParticipant) {
         throw new AppError('You must be a participant to get the invite code', 403);
+    }
+
+    // Check permissions: organizer or allowAnyoneInvite enabled
+    const isOrganizer = room.organizer.toString() === userId;
+    if (!isOrganizer && !room.allowAnyoneInvite) {
+        throw new AppError('Only the organizer can generate invite links for this room', 403);
     }
 
     // If no invite code exists, generate one

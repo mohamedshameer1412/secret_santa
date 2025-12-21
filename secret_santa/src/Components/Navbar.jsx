@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ProfileModal from './ProfileModal';
 import RoomSelectorModal from './RoomSelectorModal';
 import RoomSettingsModal from './RoomSettingsModal';
@@ -9,13 +9,25 @@ import WishlistQuickViewModal from './WishlistQuickViewModal';
 const Navbar = ({ toggleSidebar }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isRoomSelectorOpen, setIsRoomSelectorOpen] = useState(false);
     const [isRoomSettingsModalOpen, setIsRoomSettingsModalOpen] = useState(false);
     const [isWishlistModalOpen, setIsWishlistModalOpen] = useState(false);
     const [selectedRoomId, setSelectedRoomId] = useState(null);
+    const [currentRoomId, setCurrentRoomId] = useState(null);
     const dropdownRef = useRef(null);
+
+    // Detect current room from URL
+    useEffect(() => {
+        const match = location.pathname.match(/\/group-chat\/([^/]+)/);
+        if (match && match[1]) {
+            setCurrentRoomId(match[1]);
+        } else {
+            setCurrentRoomId(null);
+        }
+    }, [location]);
 
     // Close dropdown if clicked outside
     useEffect(() => {
@@ -36,13 +48,24 @@ const Navbar = ({ toggleSidebar }) => {
 
     // Handle room settings click
     const handleRoomSettingsClick = () => {
-        setIsRoomSelectorOpen(true);
-        setDropdownOpen(false);
+        // If already in a room, open settings for that room
+        if (currentRoomId) {
+            setSelectedRoomId(currentRoomId);
+            setIsRoomSettingsModalOpen(true);
+            setDropdownOpen(false);
+        } else {
+            // Otherwise, show room selector
+            setIsRoomSelectorOpen(true);
+            setDropdownOpen(false);
+        }
     };
 
     const handleRoomSelect = (roomId) => {
+        console.log('🏠 Room selected from selector:', roomId);
         setSelectedRoomId(roomId);
+        setIsRoomSelectorOpen(false); // Close room selector
         setIsRoomSettingsModalOpen(true);
+        console.log('✅ RoomSettingsModal opened with roomId:', roomId);
     };
 
     const handleWishlistClick = () => {
