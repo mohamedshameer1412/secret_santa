@@ -12,6 +12,7 @@ import Dashboard from './Pages/Dashboard';
 import VillagePeople from './Pages/VillagePeople';
 import MyWishlist from './Pages/MyWishlist';
 import ChildProfile from './Pages/ChildProfile';
+import JoinRoomPage from './Pages/JoinRoomPage';
 
 const RootRedirect = () => {
 	const { user, loading } = useAuth();
@@ -30,6 +31,9 @@ function App() {
 			<Route path="/signup" element={<SignupPage />} />
 			<Route path="/forgot-password" element={<ForgotPasswordPage />} />
 			<Route path="/reset-password" element={<ResetPasswordPage />} />
+
+			{/* Join Room via Invite Link - Public Route */}
+			<Route path="/join/:inviteCode" element={<JoinRoomPage />} />
 
 			{/* Protected Routes */}
 			<Route

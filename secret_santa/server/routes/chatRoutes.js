@@ -1089,6 +1089,42 @@ router.post('/:roomId/send-invites', protect, asyncHandler(async (req, res) => {
     });
 }));
 
+// @route   GET /api/chat/preview/:inviteCode
+// @desc    Get room preview information before joining (no auth required)
+// @access  Public
+router.get('/preview/:inviteCode', asyncHandler(async (req, res) => {
+    const { inviteCode } = req.params;
+
+    const room = await ChatRoom.findOne({ inviteCode })
+        .populate('organizer', 'username profilePic email')
+        .select('name description organizer participants maxParticipants roomType theme status');
+
+    if (!room) {
+        throw new AppError('Invalid invite code', 404);
+    }
+
+    // Don't show inactive rooms
+    if (room.status !== 'active') {
+        throw new AppError('This room is no longer active', 403);
+    }
+
+    res.json({
+        success: true,
+        room: {
+            name: room.name,
+            description: room.description,
+            organizer: {
+                username: room.organizer.username,
+                profilePic: room.organizer.profilePic
+            },
+            participantCount: room.participants.length,
+            maxParticipants: room.maxParticipants,
+            roomType: room.roomType,
+            theme: room.theme
+        }
+    });
+}));
+
 // @route   POST /api/chat/join/:inviteCode
 // @desc    Join a room using invite code
 // @access  Private
@@ -1209,6 +1245,140 @@ router.post('/:roomId/leave', protect, asyncHandler(async (req, res) => {
     res.json({
         success: true,
         message: 'Successfully left the room'
+    });
+}));
+
+// @route   POST /api/chat/:roomId/draw-names
+// @desc    Automatically draw Secret Santa pairings (Fisher-Yates shuffle)
+// @access  Private (Organizer only)
+router.post('/:roomId/draw-names', protect, asyncHandler(async (req, res) => {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+
+    const room = await ChatRoom.findById(roomId)
+        .populate('participants', 'username email profilePic');
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is organizer
+    if (room.organizer.toString() !== userId) {
+        throw new AppError('Only the organizer can draw names', 403);
+    }
+
+    // Check if room is Secret Santa type
+    if (room.roomType !== 'secret-santa') {
+        throw new AppError('This room is not a Secret Santa room', 400);
+    }
+
+    // Check minimum participants (at least 3 for meaningful Secret Santa)
+    if (room.participants.length < 3) {
+        throw new AppError('Need at least 3 participants to draw names', 400);
+    }
+
+    // Check if names already drawn
+    if (room.pairings && room.pairings.length > 0 && room.status === 'drawn') {
+        throw new AppError('Names have already been drawn. Clear existing pairings first if you want to redraw.', 400);
+    }
+
+    // Fisher-Yates shuffle algorithm
+    const participantIds = room.participants.map(p => p._id.toString());
+    const receivers = [...participantIds];
+    
+    // Shuffle receivers array
+    for (let i = receivers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [receivers[i], receivers[j]] = [receivers[j], receivers[i]];
+    }
+
+    // Ensure no one is paired with themselves
+    let attempts = 0;
+    const maxAttempts = 100;
+    let valid = false;
+
+    while (!valid && attempts < maxAttempts) {
+        valid = true;
+        for (let i = 0; i < participantIds.length; i++) {
+            if (participantIds[i] === receivers[i]) {
+                // Swap with next person (circular)
+                const nextIndex = (i + 1) % participantIds.length;
+                [receivers[i], receivers[nextIndex]] = [receivers[nextIndex], receivers[i]];
+                valid = false;
+                break;
+            }
+        }
+        attempts++;
+    }
+
+    if (!valid) {
+        throw new AppError('Could not generate valid pairings. Please try again.', 500);
+    }
+
+    // Create pairings array
+    const pairings = participantIds.map((giver, index) => ({
+        giver: giver,
+        receiver: receivers[index]
+    }));
+
+    // Update room
+    room.pairings = pairings;
+    room.status = 'drawn';
+    await room.save();
+
+    res.json({
+        success: true,
+        message: 'Secret Santa pairings have been drawn!',
+        participantCount: participantIds.length
+    });
+}));
+
+// @route   GET /api/chat/:roomId/my-assignment
+// @desc    Get current user's Secret Santa assignment
+// @access  Private
+router.get('/:roomId/my-assignment', protect, asyncHandler(async (req, res) => {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+
+    const room = await ChatRoom.findById(roomId)
+        .populate('participants', 'username email profilePic');
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is participant
+    const isParticipant = room.participants.some(p => p._id.toString() === userId);
+    if (!isParticipant) {
+        throw new AppError('You are not a participant in this room', 403);
+    }
+
+    // Check if names have been drawn
+    if (!room.pairings || room.pairings.length === 0) {
+        throw new AppError('Names have not been drawn yet', 400);
+    }
+
+    // Find user's assignment
+    const assignment = room.pairings.find(p => p.giver.toString() === userId);
+
+    if (!assignment) {
+        throw new AppError('No assignment found', 404);
+    }
+
+    // Get receiver details
+    const receiver = room.participants.find(p => p._id.toString() === assignment.receiver.toString());
+
+    res.json({
+        success: true,
+        assignment: {
+            receiverId: receiver._id,
+            receiverName: receiver.username,
+            receiverProfilePic: receiver.profilePic,
+            receiverEmail: receiver.email,
+            roomName: room.name,
+            giftBudget: room.giftBudget,
+            drawDate: room.drawDate
+        }
     });
 }));
 

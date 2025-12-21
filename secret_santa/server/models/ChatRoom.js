@@ -83,6 +83,10 @@ const roomSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  autoRollEnabled: {
+    type: Boolean,
+    default: false  // Default: organizer manually assigns pairs
+  },
   theme: {
     type: String,
     enum: ['christmas', 'winter', 'festive', 'elegant'],

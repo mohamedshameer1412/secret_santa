@@ -8,6 +8,7 @@ import RoomListSidebar from '../Components/ChatComponents/RoomListSidebar';
 import MessageInfoModal from '../Components/ChatComponents/MessageInfoModal';
 import ReactionPickerModal from '../Components/ChatComponents/ReactionPickerModal';
 import ImageViewerModal from '../Components/ChatComponents/ImageViewerModal';
+import MyAssignmentCard from '../Components/MyAssignmentCard';
 import 'animate.css';
 import './GroupChat.css';
 import axios from 'axios';
@@ -76,6 +77,8 @@ const GroupChat = () => {
     const [pinnedRooms, setPinnedRooms] = useState(new Set());
     const [showSnow, setShowSnow] = useState(false);
     const [showRoomList, setShowRoomList] = useState(window.innerWidth > 768); // Hide on mobile by default
+    const [isSecretSantaRoom, setIsSecretSantaRoom] = useState(false);
+    const [roomStatus, setRoomStatus] = useState('waiting');
 
     // Function to load authenticated image
     const loadAuthenticatedImage = useCallback(async (messageId, url) => {
@@ -224,6 +227,8 @@ const GroupChat = () => {
             };
             
             setRoom(roomData);
+            setIsSecretSantaRoom(roomData.roomType === 'secret-santa');
+            setRoomStatus(roomData.status || 'waiting');
         } catch (error) {
             console.error('Error fetching room:', error);
             if (error.response?.status === 404) {
@@ -1061,6 +1066,13 @@ const GroupChat = () => {
                                     </small>
                                 </div>
                             </div>
+
+                            {/* My Assignment Card - Show for Secret Santa rooms if drawn */}
+                            {isSecretSantaRoom && roomStatus === 'drawn' && (
+                                <div style={{ padding: '1rem', backgroundColor: 'rgba(244, 244, 244, 0.7)' }}>
+                                    <MyAssignmentCard roomId={roomId} />
+                                </div>
+                            )}
 
                             {/* Message Area */}
                             <div className="d-flex flex-column animate__animated animate__fadeIn" style={{ backgroundColor: 'rgba(244, 244, 244, 0.7)', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>

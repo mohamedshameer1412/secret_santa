@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 import './RoomSettingsModal.css';
 import InviteModal from './InviteModal';
 import { useAuth } from '../context/useAuth';
@@ -12,6 +13,8 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [isOrganizer, setIsOrganizer] = useState(false);
+  const [drawing, setDrawing] = useState(false);
+  const [roomStatus, setRoomStatus] = useState('waiting');
 
   const [roomData, setRoomData] = useState({
     name: '',
@@ -45,6 +48,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
         
         setIsOrganizer(userIsOrganizer);
         setParticipants(room.participants || []);
+        setRoomStatus(room.status || 'waiting');
         
         setRoomData({
           name: room.name || '',
@@ -116,6 +120,82 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
     } catch (error) {
       console.error('Error toggling anonymous mode:', error);
       alert(error.response?.data?.message || 'Failed to toggle anonymous mode');
+    }
+  };
+
+  const handleDrawNames = async () => {
+    if (!isOrganizer) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Access Denied',
+        text: 'Only the organizer can draw names',
+        confirmButtonColor: '#cc0000'
+      });
+      return;
+    }
+
+    if (participants.length < 3) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Not Enough Participants',
+        text: 'You need at least 3 participants to draw names',
+        confirmButtonColor: '#cc0000'
+      });
+      return;
+    }
+
+    // Confirm action
+    const result = await Swal.fire({
+      title: 'Draw Secret Santa Names?',
+      text: `This will randomly assign Secret Santa pairs for ${participants.length} participants.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#2d5016',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: '<i class="fas fa-magic"></i> Draw Names',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (!result.isConfirmed) return;
+
+    setDrawing(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `http://localhost:5000/api/chat/${roomId}/draw-names`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setRoomStatus('drawn');
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Names Drawn!',
+        html: `
+          <div style="text-align: center;">
+            <i class="fas fa-gifts fa-3x" style="color: #cc0000; margin: 1rem 0;"></i>
+            <p style="font-size: 1.1rem; margin-top: 1rem;">
+              Secret Santa pairings have been created for ${response.data.participantCount} participants!
+            </p>
+            <p style="color: #666; margin-top: 0.5rem;">
+              Each participant can now view their assignment.
+            </p>
+          </div>
+        `,
+        confirmButtonColor: '#2d5016',
+        confirmButtonText: 'Perfect!'
+      });
+    } catch (error) {
+      console.error('Error drawing names:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Draw Failed',
+        text: error.response?.data?.message || 'Could not draw names. Please try again.',
+        confirmButtonColor: '#cc0000'
+      });
+    } finally {
+      setDrawing(false);
     }
   };
 
@@ -198,6 +278,14 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
             >
               <i className="fas fa-users me-2"></i>Participants
             </button>
+            {isOrganizer && (
+              <button
+                className={`tab-btn ${activeTab === 'management' ? 'active' : ''}`}
+                onClick={() => setActiveTab('management')}
+              >
+                <i className="fas fa-crown me-2"></i>Management
+              </button>
+            )}
             <button
               className={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`}
               onClick={() => setActiveTab('rules')}
@@ -381,6 +469,116 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Management Tab - Organizer Only */}
+            {activeTab === 'management' && isOrganizer && (
+              <div className="tab-pane">
+                <div className="glass-card">
+                  <h5 className="section-title">
+                    <i className="fas fa-crown me-2"></i>Organizer Controls
+                  </h5>
+                  <p className="text-muted mb-4">
+                    Manage your Secret Santa event and draw names
+                  </p>
+
+                  {/* Draw Names Section */}
+                  <div className="draw-section mb-4">
+                    <div className="draw-card">
+                      <div className="draw-header">
+                        <i className="fas fa-magic"></i>
+                        <h6>Secret Santa Draw</h6>
+                      </div>
+                      
+                      <div className="draw-info">
+                        <div className="info-item">
+                          <i className="fas fa-users"></i>
+                          <span><strong>{participants.length}</strong> Participants</span>
+                        </div>
+                        <div className="info-item">
+                          <i className="fas fa-check-circle" 
+                             style={{ color: roomStatus === 'drawn' ? '#2d5016' : '#ffd700' }}>
+                          </i>
+                          <span>Status: <strong>{roomStatus === 'drawn' ? 'Drawn' : 'Waiting'}</strong></span>
+                        </div>
+                      </div>
+
+                      {roomStatus !== 'drawn' ? (
+                        <div>
+                          <p className="draw-description">
+                            Ready to assign Secret Santa pairs? This will randomly match each participant with someone to gift to.
+                          </p>
+                          <button 
+                            className="btn-draw-names"
+                            onClick={handleDrawNames}
+                            disabled={drawing || participants.length < 3}
+                          >
+                            {drawing ? (
+                              <>
+                                <i className="fas fa-spinner fa-spin me-2"></i>
+                                Drawing Names...
+                              </>
+                            ) : (
+                              <>
+                                <i className="fas fa-magic me-2"></i>
+                                Draw Secret Santa Names
+                              </>
+                            )}
+                          </button>
+                          {participants.length < 3 && (
+                            <small className="text-warning d-block mt-2">
+                              <i className="fas fa-exclamation-triangle me-1"></i>
+                              Need at least 3 participants
+                            </small>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="draw-success">
+                          <i className="fas fa-check-circle"></i>
+                          <p>Names have been drawn! Participants can now view their assignments.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Room Details Section */}
+                  <div className="management-section mb-4">
+                    <h6 className="mb-3">
+                      <i className="fas fa-info-circle me-2"></i>Room Details
+                    </h6>
+                    <div className="detail-grid">
+                      <div className="detail-card">
+                        <i className="fas fa-calendar-alt"></i>
+                        <div>
+                          <small>Exchange Date</small>
+                          <p>{roomData.drawDate ? new Date(roomData.drawDate).toLocaleDateString() : 'Not set'}</p>
+                        </div>
+                      </div>
+                      <div className="detail-card">
+                        <i className="fas fa-coins"></i>
+                        <div>
+                          <small>Gift Budget</small>
+                          <p>${roomData.giftBudget}</p>
+                        </div>
+                      </div>
+                      <div className="detail-card">
+                        <i className="fas fa-palette"></i>
+                        <div>
+                          <small>Theme</small>
+                          <p className="text-capitalize">{roomData.theme}</p>
+                        </div>
+                      </div>
+                      <div className="detail-card">
+                        <i className="fas fa-lock"></i>
+                        <div>
+                          <small>Privacy</small>
+                          <p>{roomData.isPrivate ? 'Private' : 'Public'}</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
