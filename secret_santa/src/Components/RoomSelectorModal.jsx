@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './RoomSelectorModal.css';
+import CreateRoomModal from './CreateRoomModal';
 
 const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Close modal on ESC key
   useEffect(() => {
@@ -37,8 +39,7 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
           'http://localhost:5000/api/chat/my-rooms',
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        
-        // For now, add dummy data if API not ready
+
         const dummyRooms = [
           {
             _id: 'room1',
@@ -71,23 +72,11 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
             isAdmin: false
           }
         ];
-        
+
         setRooms(response.data?.rooms || dummyRooms);
       } catch (error) {
         console.error('Error fetching rooms:', error);
-        // Use dummy data on error
-        setRooms([
-          {
-            _id: 'room1',
-            name: 'Office Secret Santa 2024',
-            description: 'Annual office gift exchange',
-            participantCount: 12,
-            maxParticipants: 20,
-            drawDate: '2024-12-20',
-            theme: 'christmas',
-            isAdmin: true
-          }
-        ]);
+        setRooms([]);
       } finally {
         setLoading(false);
       }
@@ -101,6 +90,18 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
     onClose();
   };
 
+  const handleRoomCreated = (newRoom) => {
+    // Add the newly created room with isAdmin flag
+    const roomWithAdmin = {
+      ...newRoom,
+      isAdmin: true, // Creator is always admin
+      participantCount: newRoom.participants?.length || 1,
+      maxParticipants: newRoom.maxParticipants || 20
+    };
+    setRooms((prev) => [roomWithAdmin, ...prev]);
+    setIsCreateModalOpen(false);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -111,10 +112,17 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
       {/* Modal Container */}
       <div className="room-selector-container">
         <div className="room-selector-content">
-          
+
           {/* Close Button */}
           <button className="room-selector-close" onClick={onClose}>
             <i className="fas fa-times"></i>
+          </button>
+
+          <button
+            className="btn btn-create-room-header"
+            onClick={() => setIsCreateModalOpen(true)}
+          >
+            <i className="fas fa-plus me-2"></i>Create New Room
           </button>
 
           {/* Header */}
@@ -122,10 +130,12 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
             <h2 className="selector-title">
               <i className="fas fa-door-open me-3"></i>Select a Room
             </h2>
-            <p className="selector-subtitle">Choose which room's settings you want to manage</p>
+            <p className="selector-subtitle">
+              Choose which room's settings you want to manage
+            </p>
           </div>
 
-          {/* Loading State */}
+          {/* Loading / Empty / Rooms */}
           {loading ? (
             <div className="text-center py-5">
               <div className="spinner-border text-light" role="status">
@@ -134,22 +144,27 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
               <p className="text-white mt-3">Loading your rooms...</p>
             </div>
           ) : rooms.length === 0 ? (
-            /* Empty State */
             <div className="empty-state">
               <i className="fas fa-inbox fa-4x mb-3 text-muted"></i>
               <h5 className="text-white mb-2">No Rooms Yet</h5>
-              <p className="text-muted">You haven't joined or created any Secret Santa rooms yet.</p>
-              <button className="btn btn-create-room mt-3">
+              <p className="text-muted">
+                You haven't joined or created any Secret Santa rooms yet.
+              </p>
+              <button
+                className="btn btn-create-room mt-3"
+                onClick={() => setIsCreateModalOpen(true)}
+              >
                 <i className="fas fa-plus me-2"></i>Create Your First Room
               </button>
             </div>
           ) : (
-            /* Rooms Grid */
             <div className="rooms-grid">
               {rooms.map((room) => (
                 <div
                   key={room._id}
-                  className={`room-card ${!room.isAdmin ? 'room-card-disabled' : ''}`}
+                  className={`room-card ${
+                    !room.isAdmin ? 'room-card-disabled' : ''
+                  }`}
                   onClick={() => room.isAdmin && handleRoomClick(room._id)}
                 >
                   {/* Theme Badge */}
@@ -167,7 +182,6 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
                     </div>
                   )}
 
-                  {/* Room Info */}
                   <h5 className="room-name">{room.name}</h5>
                   <p className="room-description">{room.description}</p>
 
@@ -201,6 +215,13 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
 
         </div>
       </div>
+
+      {/* Create Room Modal */}
+      <CreateRoomModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onRoomCreated={handleRoomCreated}
+      />
     </>
   );
 };

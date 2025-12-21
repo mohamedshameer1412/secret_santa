@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './RoomSettingsModal.css';
+import InviteModal from './InviteModal';
+import { useAuth } from '../context/useAuth';
 
 const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [participants, setParticipants] = useState([]);
+  const [isOrganizer, setIsOrganizer] = useState(false);
 
   const [roomData, setRoomData] = useState({
     name: '',
@@ -16,7 +22,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
     isPrivate: false,
     allowWishlist: true,
     allowChat: true,
-    theme: 'christmas'
+    theme: 'christmas',
+    anonymousMode: true,
+    organizer: null
   });
 
   useEffect(() => {
@@ -31,16 +39,25 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         
+        const room = response.data;
+        const organizerId = room.organizer?._id || room.organizer;
+        const userIsOrganizer = organizerId === user?.id;
+        
+        setIsOrganizer(userIsOrganizer);
+        setParticipants(room.participants || []);
+        
         setRoomData({
-          name: response.data.name || '',
-          description: response.data.description || '',
-          maxParticipants: response.data.maxParticipants || 10,
-          drawDate: response.data.drawDate || '',
-          giftBudget: response.data.giftBudget || 50,
-          isPrivate: response.data.isPrivate || false,
-          allowWishlist: response.data.allowWishlist !== false,
-          allowChat: response.data.allowChat !== false,
-          theme: response.data.theme || 'christmas'
+          name: room.name || '',
+          description: room.description || '',
+          maxParticipants: room.maxParticipants || 10,
+          drawDate: room.drawDate ? room.drawDate.split('T')[0] : '',
+          giftBudget: room.giftBudget || 50,
+          isPrivate: room.isPrivate || false,
+          allowWishlist: room.allowWishlist !== false,
+          allowChat: room.allowChat !== false,
+          theme: room.theme || 'christmas',
+          anonymousMode: room.anonymousMode !== false,
+          organizer: room.organizer
         });
       } catch (error) {
         console.error('Error fetching room data:', error);
@@ -51,7 +68,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
     };
 
     fetchRoomData();
-  }, [isOpen, roomId]);
+  }, [isOpen, roomId, user]);
 
   // Close modal on ESC key
   useEffect(() => {
@@ -78,6 +95,28 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const handleToggleAnonymous = async () => {
+    if (!isOrganizer) {
+      alert('Only the organizer can toggle anonymous mode');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `http://localhost:5000/api/chat/${roomId}/anonymous-mode`,
+        { anonymousMode: !roomData.anonymousMode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      setRoomData(prev => ({ ...prev, anonymousMode: !prev.anonymousMode }));
+      alert(`Anonymous mode ${!roomData.anonymousMode ? 'enabled' : 'disabled'} successfully!`);
+    } catch (error) {
+      console.error('Error toggling anonymous mode:', error);
+      alert(error.response?.data?.message || 'Failed to toggle anonymous mode');
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -285,6 +324,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                       id="isPrivate"
                       checked={roomData.isPrivate}
                       onChange={handleInputChange}
+                      disabled={!isOrganizer}
                     />
                     <label className="form-check-label" htmlFor="isPrivate">
                       Private Room (Invite only)
@@ -292,14 +332,55 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                   </div>
 
                   <div className="participant-list">
-                    <h6 className="mb-3">Current Participants (0)</h6>
-                    <div className="empty-state">
-                      <i className="fas fa-user-plus fa-3x mb-3 text-muted"></i>
-                      <p className="text-muted">No participants yet. Share the room link to invite people!</p>
-                      <button className="btn btn-invite mt-2">
-                        <i className="fas fa-link me-2"></i>Copy Invite Link
-                      </button>
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <h6 className="mb-0">
+                        Current Participants ({participants.length}/{roomData.maxParticipants})
+                      </h6>
+                      {isOrganizer && (
+                        <button 
+                          className="btn btn-invite btn-sm"
+                          onClick={() => setIsInviteModalOpen(true)}
+                        >
+                          <i className="fas fa-user-plus me-2"></i>Invite
+                        </button>
+                      )}
                     </div>
+                    
+                    {participants.length === 0 ? (
+                      <div className="empty-state">
+                        <i className="fas fa-user-plus fa-3x mb-3 text-muted"></i>
+                        <p className="text-muted">No participants yet. Share the room link to invite people!</p>
+                        {isOrganizer && (
+                          <button 
+                            className="btn btn-invite mt-2"
+                            onClick={() => setIsInviteModalOpen(true)}
+                          >
+                            <i className="fas fa-link me-2"></i>Get Invite Link
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="participants-grid">
+                        {participants.map((participant, index) => (
+                          <div key={participant._id || index} className="participant-card">
+                            <img
+                              src={participant.profilePic || '/assets/santa-show.png'}
+                              alt={participant.username || participant.name}
+                              className="participant-avatar"
+                            />
+                            <div className="participant-info">
+                              <div className="participant-name">
+                                {participant.username || participant.name}
+                                {participant._id === roomData.organizer?._id && (
+                                  <span className="badge-organizer">Organizer</span>
+                                )}
+                              </div>
+                              <div className="participant-email">{participant.email}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -310,8 +391,39 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
               <div className="tab-pane">
                 <div className="glass-card">
                   <h5 className="section-title">
-                    <i className="fas fa-gavel me-2"></i>Room Rules
+                    <i className="fas fa-gavel me-2"></i>Room Rules & Privacy
                   </h5>
+
+                  {/* Anonymous Mode Toggle - Organizer Only */}
+                  <div className="anonymous-toggle-section mb-4">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <div>
+                        <strong className="text-white d-block mb-1">
+                          <i className="fas fa-user-secret me-2"></i>Anonymous Mode
+                        </strong>
+                        <small className="text-muted">
+                          Hide real identities in chat {!isOrganizer && '(Organizer only)'}
+                        </small>
+                      </div>
+                      <div className="form-check form-switch">
+                        <input
+                          className="form-check-input form-check-input-lg"
+                          type="checkbox"
+                          id="anonymousMode"
+                          checked={roomData.anonymousMode}
+                          onChange={handleToggleAnonymous}
+                          disabled={!isOrganizer}
+                          style={{ cursor: isOrganizer ? 'pointer' : 'not-allowed' }}
+                        />
+                      </div>
+                    </div>
+                    {roomData.anonymousMode && (
+                      <div className="alert alert-info glass-alert-info">
+                        <i className="fas fa-info-circle me-2"></i>
+                        Participants will see anonymous names instead of real identities in the chat.
+                      </div>
+                    )}
+                  </div>
 
                   <div className="form-check form-switch mb-3">
                     <input
@@ -321,6 +433,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                       id="allowWishlist"
                       checked={roomData.allowWishlist}
                       onChange={handleInputChange}
+                      disabled={!isOrganizer}
                     />
                     <label className="form-check-label" htmlFor="allowWishlist">
                       Allow Wishlist Creation
@@ -335,9 +448,10 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
                       id="allowChat"
                       checked={roomData.allowChat}
                       onChange={handleInputChange}
+                      disabled={!isOrganizer}
                     />
                     <label className="form-check-label" htmlFor="allowChat">
-                      Enable Anonymous Chat
+                      Enable Group Chat
                     </label>
                   </div>
 
@@ -419,6 +533,14 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
           )}
         </div>
       </div>
+
+      {/* Invite Modal */}
+      <InviteModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        roomId={roomId}
+        roomName={roomData.name}
+      />
     </>
   );
 };

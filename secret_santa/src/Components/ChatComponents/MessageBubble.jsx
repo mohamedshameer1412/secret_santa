@@ -20,7 +20,8 @@ const MessageBubble = ({
     setShowMessageMenu,
     setSelectedMessageId,
     handleMenuReact,
-    handleFileDownload
+    handleFileDownload,
+    handleImageClick
 }) => {
     return (
         <div
@@ -81,8 +82,7 @@ const MessageBubble = ({
                                             style={{ maxWidth: '250px', maxHeight: '250px', objectFit: 'cover', cursor: 'pointer' }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                // Open in new tab with blob URL
-                                                window.open(blobUrl, '_blank');
+                                                handleImageClick(blobUrl, msg.attachment.originalName || msg.attachment.fileName);
                                             }}
                                         />
                                     ) : (
@@ -174,90 +174,109 @@ const MessageBubble = ({
                     )}
                 </div>
 
-                {/* WhatsApp-style context menu */}
+                {/* Context menu */}
                 {showMessageMenu === msg._id && (
                     <div 
                         className="message-menu position-fixed bg-white rounded-3 shadow-lg py-2 z-3"
                         style={{
                             left: `${messageMenuPosition.x}px`,
                             top: `${messageMenuPosition.y}px`,
-                            minWidth: '220px',
+                            minWidth: '200px',
                             zIndex: 1050,
-                            border: '1px solid #dee2e6'
+                            border: '1px solid rgba(0, 0, 0, 0.1)'
                         }}
                     >
                         {!msg.isDeleted && (
                             <>
+                                {/* Message Info */}
                                 <button
-                                    className="dropdown-item d-flex align-items-center gap-3 px-3 py-2"
+                                    className="dropdown-item d-flex align-items-center gap-2 px-3 py-2"
                                     onClick={() => handleMenuInfo(msg._id)}
+                                    style={{ fontSize: '0.9rem' }}
                                 >
-                                    <i className="fa-solid fa-info-circle text-primary"></i>
+                                    <i className="fa-solid fa-info-circle" style={{ width: '18px', color: '#6c757d' }}></i>
                                     <span>Message Info</span>
                                 </button>
                                 
-                                {/* Quick Reactions Section */}
-                                <div className="px-3 py-2 border-top border-bottom">
-                                    <small className="text-muted d-block mb-2" style={{ fontSize: '0.75rem' }}>Quick Reactions</small>
+                                {/* Quick Reactions */}
+                                <div className="px-3 py-2 border-top border-bottom my-1">
+                                    <small className="text-muted d-block mb-2" style={{ fontSize: '0.75rem' }}>React</small>
                                     <div className="d-flex gap-2 justify-content-around align-items-center">
                                         {quickReactions.map(emoji => (
                                             <button
                                                 key={emoji}
-                                                className="btn btn-sm btn-light border"
+                                                className="btn btn-sm p-0"
                                                 onClick={() => {
                                                     handleReaction(msg._id, emoji);
                                                     setShowMessageMenu(null);
                                                     setSelectedMessageId(null);
                                                 }}
                                                 style={{ 
-                                                    fontSize: '1.3rem',
-                                                    padding: '6px 10px',
+                                                    fontSize: '1.4rem',
+                                                    width: '36px',
+                                                    height: '36px',
                                                     transition: 'transform 0.2s',
-                                                    backgroundColor: 'transparent'
+                                                    backgroundColor: 'transparent',
+                                                    border: 'none'
                                                 }}
-                                                onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
+                                                onMouseEnter={(e) => e.target.style.transform = 'scale(1.3)'}
                                                 onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
                                             >
                                                 {emoji}
                                             </button>
                                         ))}
                                         
-                                        {/* Plus icon for more reactions */}
+                                        {/* More reactions */}
                                         <button
-                                            className="btn btn-sm btn-light border"
+                                            className="btn btn-sm p-0"
                                             onClick={() => handleMenuReact(msg._id)}
                                             style={{ 
-                                                fontSize: '1.3rem',
-                                                padding: '6px 10px',
-                                                transition: 'transform 0.2s',
-                                                backgroundColor: 'transparent'
+                                                fontSize: '1.2rem',
+                                                width: '36px',
+                                                height: '36px',
+                                                transition: 'all 0.2s',
+                                                backgroundColor: 'transparent',
+                                                border: '1px solid #dee2e6',
+                                                borderRadius: '50%',
+                                                color: '#6c757d'
                                             }}
-                                            onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
-                                            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                                            onMouseEnter={(e) => {
+                                                e.target.style.transform = 'scale(1.15)';
+                                                e.target.style.borderColor = '#adb5bd';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.transform = 'scale(1)';
+                                                e.target.style.borderColor = '#dee2e6';
+                                            }}
                                             title="More reactions"
                                         >
                                             <i className="fa-solid fa-plus"></i>
                                         </button>
                                     </div>
                                 </div>
-                                {isUser && (
+                                
+                                {/* Edit and Delete (only for user's own messages) */}
+                                {isUser && !msg.attachment && (
                                     <>
-                                        <div className="dropdown-divider"></div>
                                         <button
-                                            className="dropdown-item d-flex align-items-center gap-3 px-3 py-2"
+                                            className="dropdown-item d-flex align-items-center gap-2 px-3 py-2"
                                             onClick={() => handleMenuEdit(msg)}
+                                            style={{ fontSize: '0.9rem' }}
                                         >
-                                            <i className="fa-solid fa-edit text-success"></i>
+                                            <i className="fa-solid fa-edit" style={{ width: '18px', color: '#0d6efd' }}></i>
                                             <span>Edit</span>
                                         </button>
-                                        <button
-                                            className="dropdown-item d-flex align-items-center gap-3 px-3 py-2"
-                                            onClick={() => handleMenuDelete(msg._id)}
-                                        >
-                                            <i className="fa-solid fa-trash text-danger"></i>
-                                            <span>Delete</span>
-                                        </button>
                                     </>
+                                )}
+                                {isUser && (
+                                    <button
+                                        className="dropdown-item d-flex align-items-center gap-2 px-3 py-2"
+                                        onClick={() => handleMenuDelete(msg._id)}
+                                        style={{ fontSize: '0.9rem' }}
+                                    >
+                                        <i className="fa-solid fa-trash" style={{ width: '18px', color: '#dc3545' }}></i>
+                                        <span>Delete</span>
+                                    </button>
                                 )}
                             </>
                         )}

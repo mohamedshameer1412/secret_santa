@@ -468,7 +468,6 @@
 /* Chat scroll container */
 .chat-scroll {
     position: relative !important;
-    scroll-behavior: smooth !important;
     flex: 1 1 auto !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;

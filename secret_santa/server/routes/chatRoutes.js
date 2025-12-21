@@ -100,7 +100,7 @@ router.post('/create-room', protect, asyncHandler(async (req, res) => {
 // @desc    Create a Secret Santa room (with additional settings)
 // @access  Private
 router.post('/create', protect, asyncHandler(async (req, res) => {
-    const { roomName, name, description, maxParticipants, drawDate, giftBudget, theme, isPrivate, allowWishlist, allowChat } = req.body;
+    const { roomName, name, description, maxParticipants, drawDate, giftBudget, theme, isPrivate, allowWishlist, allowChat, anonymousMode } = req.body;
     const adminId = req.user.id;
 
     // Support both 'roomName' and 'name' for backward compatibility
@@ -122,7 +122,8 @@ router.post('/create', protect, asyncHandler(async (req, res) => {
         theme: theme || 'christmas',
         isPrivate: isPrivate || false,
         allowWishlist: allowWishlist !== false, // Default true
-        allowChat: allowChat !== false // Default true
+        allowChat: allowChat !== false, // Default true
+        anonymousMode: anonymousMode !== false // Default true
     }, adminId);
 
     res.status(201).json({
@@ -157,22 +158,45 @@ router.get('/my-rooms', protect, asyncHandler(async (req, res) => {
         .select('name description organizer participants maxParticipants theme drawDate status roomType anonymousMode messages createdAt')
         .sort({ createdAt: -1 });
 
-    // Add isAdmin flag and other useful info for each room
-    const roomsWithMetadata = rooms.map(room => ({
-        _id: room._id,
-        name: room.name,
-        description: room.description,
-        organizer: room.organizer,
-        participantCount: room.participants.length,
-        maxParticipants: room.maxParticipants,
-        theme: room.theme,
-        drawDate: room.drawDate,
-        status: room.status,
-        roomType: room.roomType,
-        anonymousMode: room.anonymousMode,
-        messageCount: room.messages ? room.messages.length : 0,
-        createdAt: room.createdAt,
-        isAdmin: room.organizer._id.toString() === userId
+    // Get last message for each room
+    const roomsWithMetadata = await Promise.all(rooms.map(async (room) => {
+        // Get the most recent message for this room
+        let lastMessage = null;
+        if (room.messages && room.messages.length > 0) {
+            try {
+                const lastMsg = await Message.findById(room.messages[room.messages.length - 1])
+                    .populate('sender', 'username name')
+                    .select('sender encryptedText iv tag createdAt isDeleted');
+                
+                if (lastMsg) {
+                    lastMessage = {
+                        text: lastMsg.isDeleted ? 'Message deleted' : Message.decryptText(lastMsg.encryptedText, lastMsg.iv, lastMsg.tag).substring(0, 50),
+                        sender: lastMsg.sender?.name || lastMsg.sender?.username || 'Unknown',
+                        createdAt: lastMsg.createdAt
+                    };
+                }
+            } catch (err) {
+                console.error('Error fetching last message:', err);
+            }
+        }
+
+        return {
+            _id: room._id,
+            name: room.name,
+            description: room.description,
+            organizer: room.organizer,
+            participantCount: room.participants.length,
+            maxParticipants: room.maxParticipants,
+            theme: room.theme,
+            drawDate: room.drawDate,
+            status: room.status,
+            roomType: room.roomType,
+            anonymousMode: room.anonymousMode,
+            messageCount: room.messages ? room.messages.length : 0,
+            createdAt: room.createdAt,
+            isAdmin: room.organizer._id.toString() === userId,
+            lastMessage
+        };
     }));
 
     res.json({
@@ -945,6 +969,173 @@ router.delete('/:roomId', protect, asyncHandler(async (req, res) => {
     res.json({
         success: true,
         message: 'Room deleted successfully'
+    });
+}));
+
+// @route   PATCH /api/chat/:roomId/anonymous-mode
+// @desc    Toggle anonymous mode (organizer only)
+// @access  Private
+router.patch('/:roomId/anonymous-mode', protect, asyncHandler(async (req, res) => {
+    const { roomId } = req.params;
+    const { anonymousMode } = req.body;
+    const userId = req.user.id;
+
+    const room = await ChatRoom.findById(roomId);
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is organizer
+    if (room.organizer.toString() !== userId) {
+        throw new AppError('Only the room organizer can toggle anonymous mode', 403);
+    }
+
+    room.anonymousMode = anonymousMode;
+    await room.save();
+
+    res.json({
+        success: true,
+        message: `Anonymous mode ${anonymousMode ? 'enabled' : 'disabled'} successfully`,
+        anonymousMode: room.anonymousMode
+    });
+}));
+
+// @route   GET /api/chat/:roomId/invite-code
+// @desc    Get or generate invite code for a room
+// @access  Private
+router.get('/:roomId/invite-code', protect, asyncHandler(async (req, res) => {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+
+    const room = await ChatRoom.findById(roomId);
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is participant
+    const isParticipant = room.participants.some(p => p.toString() === userId);
+    if (!isParticipant) {
+        throw new AppError('You must be a participant to get the invite code', 403);
+    }
+
+    // If no invite code exists, generate one
+    if (!room.inviteCode) {
+        const crypto = require('crypto');
+        room.inviteCode = `SANTA-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+        await room.save();
+    }
+
+    res.json({
+        success: true,
+        inviteCode: room.inviteCode,
+        roomName: room.name
+    });
+}));
+
+// @route   POST /api/chat/:roomId/send-invites
+// @desc    Send email invitations to join the room
+// @access  Private
+router.post('/:roomId/send-invites', protect, asyncHandler(async (req, res) => {
+    const { roomId } = req.params;
+    const { emails, customMessage } = req.body;
+    const userId = req.user.id;
+
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+        throw new AppError('Email addresses are required', 400);
+    }
+
+    const room = await ChatRoom.findById(roomId).populate('organizer', 'username email');
+
+    if (!room) {
+        throw new AppError('Room not found', 404);
+    }
+
+    // Check if user is organizer
+    if (room.organizer._id.toString() !== userId) {
+        throw new AppError('Only the room organizer can send invitations', 403);
+    }
+
+    // Ensure room has an invite code
+    if (!room.inviteCode) {
+        const crypto = require('crypto');
+        room.inviteCode = `SANTA-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+        await room.save();
+    }
+
+    // In a real application, you would send emails here
+    // For now, we'll just log the invitation details
+    const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/join/${room.inviteCode}`;
+    
+    console.log('Sending invitations to:', emails);
+    console.log('Invite link:', inviteLink);
+    console.log('Custom message:', customMessage);
+
+    // TODO: Implement actual email sending with sendEmail utility
+    // const sendEmail = require('../utils/sendEmail');
+    // for (const email of emails) {
+    //     await sendEmail({
+    //         to: email,
+    //         subject: `You're invited to join ${room.name}!`,
+    //         text: `${room.organizer.username} has invited you to join their Secret Santa room "${room.name}".\n\n${customMessage || ''}\n\nInvite Code: ${room.inviteCode}\nJoin here: ${inviteLink}`
+    //     });
+    // }
+
+    res.json({
+        success: true,
+        message: `Invitations sent to ${emails.length} email(s)`,
+        inviteCode: room.inviteCode
+    });
+}));
+
+// @route   POST /api/chat/join/:inviteCode
+// @desc    Join a room using invite code
+// @access  Private
+router.post('/join/:inviteCode', protect, asyncHandler(async (req, res) => {
+    const { inviteCode } = req.params;
+    const userId = req.user.id;
+
+    const room = await ChatRoom.findOne({ inviteCode })
+        .populate('organizer', 'username profilePic email');
+
+    if (!room) {
+        throw new AppError('Invalid invite code', 404);
+    }
+
+    // Check if already a participant
+    if (room.participants.includes(userId)) {
+        return res.json({
+            success: true,
+            message: 'You are already a member of this room',
+            room: {
+                _id: room._id,
+                name: room.name,
+                description: room.description
+            }
+        });
+    }
+
+    // Check if room is full
+    if (room.participants.length >= room.maxParticipants) {
+        throw new AppError('This room is already full', 400);
+    }
+
+    // Add user to participants
+    room.participants.push(userId);
+    await room.save();
+
+    res.json({
+        success: true,
+        message: `Successfully joined ${room.name}!`,
+        room: {
+            _id: room._id,
+            name: room.name,
+            description: room.description,
+            organizer: room.organizer,
+            participantCount: room.participants.length,
+            maxParticipants: room.maxParticipants
+        }
     });
 }));
 

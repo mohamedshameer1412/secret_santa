@@ -82,6 +82,7 @@ const MessageList = ({
     quickReactions,
     typingUsers,
     chatEndRef,
+    chatContainerRef,
     handleMessageLongPress,
     handleMessageTouchStart,
     handleMessageTouchEnd,
@@ -94,12 +95,13 @@ const MessageList = ({
     setShowMessageMenu,
     setSelectedMessageId,
     handleMenuReact,
-    handleFileDownload
+    handleFileDownload,
+    handleImageClick
 }) => {
     const groupedItems = groupMessagesByDate(messages);
     
     return (
-        <div className="chat-scroll overflow-auto px-3 py-2" style={{ flex: '1 1 auto', overflowY: 'auto' }}>
+        <div ref={chatContainerRef} className="chat-scroll overflow-auto px-3 py-2" style={{ flex: '1 1 auto', overflowY: 'auto' }}>
             {groupedItems.map((item) => {
                 if (item.type === 'date-separator') {
                     return (
@@ -153,6 +155,7 @@ const MessageList = ({
                         setSelectedMessageId={setSelectedMessageId}
                         handleMenuReact={handleMenuReact}
                         handleFileDownload={handleFileDownload}
+                        handleImageClick={handleImageClick}
                     />
                 );
             })}

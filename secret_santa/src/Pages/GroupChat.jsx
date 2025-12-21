@@ -7,6 +7,7 @@ import MessageInput from '../Components/ChatComponents/MessageInput';
 import RoomListSidebar from '../Components/ChatComponents/RoomListSidebar';
 import MessageInfoModal from '../Components/ChatComponents/MessageInfoModal';
 import ReactionPickerModal from '../Components/ChatComponents/ReactionPickerModal';
+import ImageViewerModal from '../Components/ChatComponents/ImageViewerModal';
 import 'animate.css';
 import './GroupChat.css';
 import axios from 'axios';
@@ -55,8 +56,10 @@ const GroupChat = () => {
     const [showMessageMenu, setShowMessageMenu] = useState(null);
     const [messageMenuPosition, setMessageMenuPosition] = useState({ x: 0, y: 0 });
     const [showMessageInfo, setShowMessageInfo] = useState(null);
+    const [imageViewer, setImageViewer] = useState({ show: false, url: null, fileName: null });
 
     const chatEndRef = useRef(null);
+    const chatContainerRef = useRef(null);
     const inputRef = useRef(null);
     const typingTimeoutRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -64,6 +67,7 @@ const GroupChat = () => {
 
     const prevMessageCountRef = useRef(0);
     const initialScrollDone = useRef(false);
+    const userScrolledUp = useRef(false);
 
     const [imageUrls, setImageUrls] = useState({}); // Store blob URLs for images
     
@@ -132,6 +136,24 @@ const GroupChat = () => {
             });
         };
     }, [imageUrls]);
+
+    // Fetch user's rooms
+    const fetchRooms = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            
+            const res = await axios.get(`${API_URL}/my-rooms`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            if (res.data.rooms && res.data.rooms.length > 0) {
+                setRooms(res.data.rooms);
+            }
+        } catch (error) {
+            console.error('Error fetching rooms:', error);
+        }
+    }, []);
 
     useEffect(() => {
         const fetchUserRooms = async () => {
@@ -297,30 +319,59 @@ const GroupChat = () => {
     useEffect(() => {
         if (!roomId || !user) return;
 
-        // Don't reset initialScrollDone when switching rooms
-        // It will only reset when component unmounts (leaving GroupChat)
+        // Reset scroll state when switching rooms
+        userScrolledUp.current = false;
+        initialScrollDone.current = false;
 
         fetchRoomData();
         fetchMessages();
     }, [roomId, fetchRoomData, fetchMessages, user]);
 
-    // Scroll to bottom - smooth animation only on first load, instant after that
+    // Scroll to bottom - only on initial load or when sending messages
     useEffect(() => {
-        if (rawMessages.length > 0) {
-            // Use requestAnimationFrame to ensure DOM has updated
+        if (rawMessages.length === 0) return;
+        
+        // Only auto-scroll if:
+        // 1. Initial load (first time messages are loaded)
+        // 2. User explicitly sent a message (userScrolledUp is false)
+        const isInitialLoad = !initialScrollDone.current;
+        const userJustSentMessage = !userScrolledUp.current && prevMessageCountRef.current < rawMessages.length;
+        
+        if (isInitialLoad || userJustSentMessage) {
             requestAnimationFrame(() => {
                 setTimeout(() => {
                     if (chatEndRef.current) {
-                        // First time: smooth scroll. After that: instant jump to bottom
                         chatEndRef.current.scrollIntoView({ 
-                            behavior: initialScrollDone.current ? 'auto' : 'smooth' 
+                            behavior: isInitialLoad ? 'smooth' : 'auto'
                         });
                         initialScrollDone.current = true;
                     }
                 }, 100);
             });
         }
+        
+        // Update previous message count
+        prevMessageCountRef.current = rawMessages.length;
     }, [rawMessages]);
+    
+    // Track user scroll position
+    useEffect(() => {
+        const handleScroll = () => {
+            if (!chatContainerRef.current) return;
+            
+            const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+            
+            // Mark as scrolled up only if user is NOT at bottom
+            userScrolledUp.current = !isAtBottom;
+        };
+        
+        const container = chatContainerRef.current;
+        if (container) {
+            container.addEventListener('scroll', handleScroll);
+            return () => container.removeEventListener('scroll', handleScroll);
+        }
+    }, [roomId]);
 
     // Typing indicator logic
     const setUserTyping = (isTyping) => {
@@ -380,8 +431,12 @@ const GroupChat = () => {
                 setUserTyping(false);
                 setMessage('');
                 
-                // Fetch messages immediately after sending
+                // Reset scroll flag so user sees their own message
+                userScrolledUp.current = false;
+                
+                // Fetch messages and update room list
                 fetchMessages();
+                fetchRooms();
             } catch (error) {
                 console.error('Error sending message:', error);
                 if (error.response?.status === 401) {
@@ -464,6 +519,9 @@ const GroupChat = () => {
                 timerProgressBar: true
             });
 
+            // Reset scroll flag so user sees their uploaded file
+            userScrolledUp.current = false;
+            
             fetchMessages();
         } catch (error) {
             console.error('Error uploading file:', error);
@@ -679,8 +737,20 @@ const GroupChat = () => {
 
     // Get sorted rooms (pinned first)
     const sortedRooms = useMemo(() => {
+        // Separate pinned and unpinned rooms
         const pinned = rooms.filter(r => pinnedRooms.has(r._id));
         const unpinned = rooms.filter(r => !pinnedRooms.has(r._id));
+        
+        // Sort both by last message time (most recent first)
+        const sortByLastMessage = (a, b) => {
+            const timeA = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : new Date(a.createdAt).getTime();
+            const timeB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : new Date(b.createdAt).getTime();
+            return timeB - timeA; // Descending order (newest first)
+        };
+        
+        pinned.sort(sortByLastMessage);
+        unpinned.sort(sortByLastMessage);
+        
         return [...pinned, ...unpinned];
     }, [rooms, pinnedRooms]);
 
@@ -756,6 +826,10 @@ const GroupChat = () => {
     const handleMenuReact = (messageId) => {
         setShowReactionPicker(messageId);
         closeMessageMenu();
+    };
+
+    const handleImageClick = (imageUrl, fileName) => {
+        setImageViewer({ show: true, url: imageUrl, fileName });
     };
 
     // Close menu when clicking outside
@@ -999,6 +1073,7 @@ const GroupChat = () => {
                                     quickReactions={quickReactions}
                                     typingUsers={typingUsers}
                                     chatEndRef={chatEndRef}
+                                    chatContainerRef={chatContainerRef}
                                     handleMessageLongPress={handleMessageLongPress}
                                     handleMessageTouchStart={handleMessageTouchStart}
                                     handleMessageTouchEnd={handleMessageTouchEnd}
@@ -1012,6 +1087,7 @@ const GroupChat = () => {
                                     setSelectedMessageId={setSelectedMessageId}
                                     handleMenuReact={handleMenuReact}
                                     handleFileDownload={handleFileDownload}
+                                    handleImageClick={handleImageClick}
                                 />
                                 
                                 {/* Message Input */}
@@ -1058,6 +1134,14 @@ const GroupChat = () => {
                 setSelectedMessageId={setSelectedMessageId}
                 handleReaction={handleReaction}
             />
+
+            {imageViewer.show && (
+                <ImageViewerModal
+                    imageUrl={imageViewer.url}
+                    fileName={imageViewer.fileName}
+                    onClose={() => setImageViewer({ show: false, url: null, fileName: null })}
+                />
+            )}
         </div>
     );
 };
