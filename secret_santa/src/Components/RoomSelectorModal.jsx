@@ -35,17 +35,14 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        console.log('📡 Fetching user rooms...');
         const response = await axios.get(
           'http://localhost:5000/api/chat/my-rooms',
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log('✅ Rooms fetched:', response.data);
         
         // Use real rooms from API, no dummy data fallback
         const fetchedRooms = response.data?.rooms || [];
-        console.log('📋 Total rooms found:', fetchedRooms.length);
         setRooms(fetchedRooms);
       } catch (error) {
         console.error('❌ Error fetching rooms:', error);
@@ -60,7 +57,6 @@ const RoomSelectorModal = ({ isOpen, onClose, onSelectRoom }) => {
   }, [isOpen]);
 
   const handleRoomClick = (roomId) => {
-    console.log('🖱️ Room card clicked:', roomId);
     onSelectRoom(roomId);
     onClose();
   };

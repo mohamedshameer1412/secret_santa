@@ -32,6 +32,12 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 	});
 
 	useEffect(() => {
+		if (isOpen) {
+			setActiveTab("general");
+		}
+	}, [isOpen]);
+
+	useEffect(() => {
 		const fetchRoomData = async () => {
 			if (!isOpen || !roomId) {
 				return;
@@ -49,12 +55,12 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				const room = response.data.room || response.data;
 				// Backend now returns organizer._id as string
 				const organizerId = room.organizer?._id || room.organizer;
-			const userId = user?.id || user?._id;
-			const userIsOrganizer = organizerId === userId;
+				const userId = user?.id || user?._id;
+				const userIsOrganizer = organizerId === userId;
 
-			setIsOrganizer(userIsOrganizer);
-			setParticipants(room.participants || []);
-			setRoomStatus(room.status || "waiting");
+				setIsOrganizer(userIsOrganizer);
+				setParticipants(room.participants || []);
+				setRoomStatus(room.status || "waiting");
 
 				setRoomData({
 					name: room.name || "",
@@ -232,6 +238,95 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 			alert(error.response?.data?.error || "Failed to update room settings");
 		} finally {
 			setIsSaving(false);
+		}
+	};
+
+	const handleResetAssignments = async () => {
+		const result = await Swal.fire({
+			title: "Reset All Assignments?",
+			text: "This will clear all Secret Santa pairings. Participants can be reassigned later.",
+			icon: "warning",
+			showCancelButton: true,
+			confirmButtonColor: "#cc0000",
+			cancelButtonColor: "#6c757d",
+			confirmButtonText: "Yes, Reset",
+			cancelButtonText: "Cancel",
+		});
+
+		if (!result.isConfirmed) return;
+
+		try {
+			const token = localStorage.getItem("token");
+			await axios.post(
+				`http://localhost:5000/api/chat/${roomId}/reset-assignments`,
+				{},
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+
+			Swal.fire({
+				icon: "success",
+				title: "Assignments Reset",
+				text: "All Secret Santa assignments have been cleared.",
+				confirmButtonColor: "#2d5016",
+			});
+
+			setRoomStatus("waiting");
+		} catch (error) {
+			Swal.fire({
+				icon: "error",
+				title: "Reset Failed",
+				text: error.response?.data?.message || "Failed to reset assignments",
+				confirmButtonColor: "#cc0000",
+			});
+		}
+	};
+
+	const handleDeleteRoom = async () => {
+		// Close modal first so it doesn't block the confirmation dialog
+		onClose();
+
+		const result = await Swal.fire({
+			title: "Delete This Room?",
+			text: "This action cannot be undone! All messages, assignments, and room data will be permanently deleted.",
+			icon: "error",
+			showCancelButton: true,
+			confirmButtonColor: "#cc0000",
+			cancelButtonColor: "#6c757d",
+			confirmButtonText: "Yes, Delete Forever",
+			cancelButtonText: "Cancel",
+			input: "text",
+			inputPlaceholder: 'Type "DELETE" to confirm',
+			inputValidator: (value) => {
+				if (value !== "DELETE") {
+					return 'You must type "DELETE" to confirm';
+				}
+			},
+		});
+
+		if (!result.isConfirmed) return;
+
+		try {
+			const token = localStorage.getItem("token");
+			await axios.delete(`http://localhost:5000/api/chat/${roomId}`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+
+			Swal.fire({
+				icon: "success",
+				title: "Room Deleted",
+				text: "The room has been permanently deleted.",
+				confirmButtonColor: "#2d5016",
+			});
+
+			// Stay in GroupChats section
+			window.location.href = "/group-chat";
+		} catch (error) {
+			Swal.fire({
+				icon: "error",
+				title: "Delete Failed",
+				text: error.response?.data?.message || "Failed to delete room",
+				confirmButtonColor: "#cc0000",
+			});
 		}
 	};
 
@@ -448,7 +543,6 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 								style={{
 									padding: "20px",
 									background: "#1a1a2e",
-									
 								}}
 							>
 								{/* General Tab */}
@@ -1124,12 +1218,34 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 
 											<div className='form-group mb-3'>
 												<label className='form-label'>Re-draw Algorithm</label>
-												<select className='form-control glass-input'>
-													<option value='random'>Random Assignment</option>
-													<option value='balanced'>
+												<select
+													className='form-control glass-input'
+													style={{
+														background: "rgba(255,255,255,0.1)",
+														color: "#fff",
+														border: "1px solid rgba(255,215,0,0.3)",
+														padding: "10px",
+														borderRadius: "8px",
+													}}
+												>
+													<option
+														value='random'
+														style={{ background: "#1a1a2e", color: "#fff" }}
+													>
+														Random Assignment
+													</option>
+													<option
+														value='balanced'
+														style={{ background: "#1a1a2e", color: "#fff" }}
+													>
 														Balanced (No repeats from last year)
 													</option>
-													<option value='fair'>Fair Distribution</option>
+													<option
+														value='fair'
+														style={{ background: "#1a1a2e", color: "#fff" }}
+													>
+														Fair Distribution
+													</option>
 												</select>
 											</div>
 
@@ -1138,11 +1254,17 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 													<i className='fas fa-exclamation-circle me-2'></i>
 													Danger Zone
 												</h6>
-												<button className='btn btn-danger w-100 mb-2'>
+												<button
+													className='btn btn-danger w-100 mb-2'
+													onClick={handleResetAssignments}
+												>
 													<i className='fas fa-redo me-2'></i>Reset All
 													Assignments
 												</button>
-												<button className='btn btn-danger w-100'>
+												<button
+													className='btn btn-danger w-100'
+													onClick={handleDeleteRoom}
+												>
 													<i className='fas fa-trash me-2'></i>Delete Room
 												</button>
 											</div>
@@ -1193,4 +1315,3 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 };
 
 export default RoomSettingsModal;
-

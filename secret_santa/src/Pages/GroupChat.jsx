@@ -487,9 +487,6 @@ const GroupChat = () => {
             setUploadingFile(true);
             const token = localStorage.getItem('token');
             
-            console.log('Upload - Token:', token ? 'exists' : 'missing');
-            console.log('Upload - RoomId:', roomId);
-            console.log('Upload - API URL:', `${API_URL}/${roomId}/upload`);
             
             if (!token) {
                 console.error('No token found');
@@ -512,7 +509,6 @@ const GroupChat = () => {
                 }
             );
 
-            console.log('Upload success:', response.data);
 
             Swal.fire({
                 icon: 'success',

@@ -23,18 +23,14 @@ const SignupPage = () => {
 
         setIsLoading(true);
         try {
-            console.log("Submitting registration with:", { fullName, email }); // Log what we're sending
             const registrationData = {
                 name: fullName,
                 username: username,
                 email: email,
                 password: password
             };
-            
-            console.log("Submitting registration with:", registrationData);
-            
+                        
             const result = await authService.register(registrationData);
-            console.log("Registration successful:", result);
             
             alert('Registration successful! Please check your email to verify your account.');
             navigate('/login');

@@ -1653,4 +1653,72 @@ router.get(
 	})
 );
 
+// @route   POST /api/chat/:roomId/reset-assignments
+// @desc    Reset all Secret Santa assignments
+// @access  Private (Organizer only)
+router.post(
+	"/:roomId/reset-assignments",
+	protect,
+	asyncHandler(async (req, res) => {
+		const { roomId } = req.params;
+		const userId = req.user.id;
+
+		const room = await ChatRoom.findById(roomId);
+
+		if (!room) {
+			throw new AppError("Room not found", 404);
+		}
+
+		// Check if user is organizer
+		if (room.organizer.toString() !== userId) {
+			throw new AppError("Only the organizer can reset assignments", 403);
+		}
+
+		// Reset assignments
+		room.pairings = [];
+		room.status = "waiting";
+		await room.save();
+
+		res.json({
+			success: true,
+			message: "All assignments have been reset successfully",
+		});
+	})
+);
+
+// @route   DELETE /api/chat/:roomId
+// @desc    Delete a room (Organizer only)
+// @access  Private
+router.delete(
+	"/:roomId",
+	protect,
+	asyncHandler(async (req, res) => {
+		const { roomId } = req.params;
+		const userId = req.user.id;
+
+		const room = await ChatRoom.findById(roomId);
+
+		if (!room) {
+			throw new AppError("Room not found", 404);
+		}
+
+		// Check if user is organizer
+		if (room.organizer.toString() !== userId) {
+			throw new AppError("Only the organizer can delete this room", 403);
+		}
+
+		// Delete associated messages if chatRoom exists
+		if (room.chatRoom) {
+			await Message.deleteMany({ room: room.chatRoom });
+		}
+
+		// Delete the room
+		await ChatRoom.findByIdAndDelete(roomId);
+
+		res.json({
+			success: true,
+			message: "Room deleted successfully",
+		});
+	})
+);
 module.exports = router;

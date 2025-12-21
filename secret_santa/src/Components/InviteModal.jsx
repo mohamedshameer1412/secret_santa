@@ -169,7 +169,7 @@ const InviteModal = ({ isOpen, onClose, roomId, roomName }) => {
                 <h5 className="section-title">
                   <i className="fas fa-key me-2"></i>Invite Code
                 </h5>
-                <p className="text-muted mb-3">Share this code with participants to join the room</p>
+                <p className="text-white mb-3">Share this code with participants to join the room</p>
                 
                 <div className="invite-code-display">
                   <div className="code-box">
@@ -190,7 +190,7 @@ const InviteModal = ({ isOpen, onClose, roomId, roomName }) => {
                 <h5 className="section-title">
                   <i className="fas fa-link me-2"></i>Shareable Link
                 </h5>
-                <p className="text-muted mb-3">Or share this direct link</p>
+                <p className="text-white mb-3">Or share this direct link</p>
                 
                 <div className="invite-link-display">
                   <div className="link-box">
@@ -211,7 +211,7 @@ const InviteModal = ({ isOpen, onClose, roomId, roomName }) => {
                 <h5 className="section-title">
                   <i className="fas fa-envelope me-2"></i>Send Email Invitations
                 </h5>
-                <p className="text-muted mb-3">Invite people directly via email</p>
+                <p className="text-white mb-3">Invite people directly via email</p>
 
                 {emailSuccess && (
                   <div className="alert alert-success glass-alert-success mb-3">

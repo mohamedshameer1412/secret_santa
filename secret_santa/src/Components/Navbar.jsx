@@ -61,11 +61,9 @@ const Navbar = ({ toggleSidebar }) => {
     };
 
     const handleRoomSelect = (roomId) => {
-        console.log('🏠 Room selected from selector:', roomId);
         setSelectedRoomId(roomId);
         setIsRoomSelectorOpen(false); // Close room selector
         setIsRoomSettingsModalOpen(true);
-        console.log('✅ RoomSettingsModal opened with roomId:', roomId);
     };
 
     const handleWishlistClick = () => {
