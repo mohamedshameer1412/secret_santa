@@ -607,9 +607,40 @@
   box-shadow: 0 2px 8px rgba(204, 0, 0, 0.4);
 }
 
-.badge-organizer::before {
-  content: '👑';
+/* Icon stays static */
+.crown-icon {
   font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+/* Text viewport */
+.organizer-text-wrapper {
+  width: 55px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Sliding text */
+.organizer-text {
+  display: inline-block;
+  width: max-content;
+  animation: slideText 5s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.badge-organizer:hover .organizer-text {
+  animation-play-state: running;
+}
+
+/* Precise slide */
+@keyframes slideText {
+  0%, 30% {
+    transform: translateX(0);
+  }
+
+  70%, 100% {
+    transform: translateX(calc(-100% + 55px + 4px));
+  }
 }
 
 .participant-email {

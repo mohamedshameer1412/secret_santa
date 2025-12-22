@@ -821,9 +821,15 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 																		{participant.username || participant.name}
 																		{participant._id ===
 																			roomData.organizer?._id && (
-																			<span className='badge-organizer'>
-																				Organizer
-																			</span>
+                                                                                <span className="badge-organizer">
+                                                                                    <span className="crown-icon">👑</span>
+
+                                                                                    <span className="organizer-text-wrapper">
+                                                                                        <span className="organizer-text">
+                                                                                            Organizer
+                                                                                        </span>
+                                                                                    </span>
+                                                                                </span>
 																		)}
 																	</div>
 																	<div className='participant-email'>

@@ -1,43 +1,62 @@
-import './App.css';
-import { useAuth } from './context/useAuth';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import "./App.css";
+import { useAuth } from "./context/useAuth";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import ProtectedRoute from "./Components/ProtectedRoute";
-import ForgotPasswordPage from './Pages/ForgotPasswordPage';
-import LoginPage from './Pages/LoginPage';
-import ResetPasswordPage from './Pages/ResetPasswordPage';
-import SignupPage from './Pages/SignupPage';
-import GroupChat from './Pages/GroupChat';
-import Dashboard from './Pages/Dashboard';
-import VillagePeople from './Pages/VillagePeople';
-import MyWishlist from './Pages/MyWishlist';
-import ChildProfile from './Pages/ChildProfile';
-import JoinRoomPage from './Pages/JoinRoomPage';
+import ForgotPasswordPage from "./Pages/ForgotPasswordPage";
+import LoginPage from "./Pages/LoginPage";
+import ResetPasswordPage from "./Pages/ResetPasswordPage";
+import SignupPage from "./Pages/SignupPage";
+import GroupChat from "./Pages/GroupChat";
+import Dashboard from "./Pages/Dashboard";
+import VillagePeople from "./Pages/VillagePeople";
+import MyWishlist from "./Pages/MyWishlist";
+import ChildProfile from "./Pages/ChildProfile";
+import JoinRoomPage from "./Pages/JoinRoomPage";
 
 const RootRedirect = () => {
 	const { user, loading } = useAuth();
 
 	if (loading) return <div>Loading...</div>; // optional
 
-	if (user) return <Navigate to="/dashboard" replace />;
-	return <Navigate to="/login" replace />;
+	if (user)
+		return (
+			<Navigate
+				to='/dashboard'
+				replace
+			/>
+		);
+	return (
+		<Navigate
+			to='/login'
+			replace
+		/>
+	);
 };
 
 function App() {
 	return (
 		<Routes>
 			{/* Public Routes */}
-			<Route path="/login" element={<LoginPage />} />
-			<Route path="/signup" element={<SignupPage />} />
-			<Route path="/forgot-password" element={<ForgotPasswordPage />} />
-			<Route path="/reset-password" element={<ResetPasswordPage />} />
-
-			{/* Join Room via Invite Link - Public Route */}
-			<Route path="/join/:inviteCode" element={<JoinRoomPage />} />
-
+			<Route
+				path='/login'
+				element={<LoginPage />}
+			/>
+			<Route
+				path='/signup'
+				element={<SignupPage />}
+			/>
+			<Route
+				path='/forgot-password'
+				element={<ForgotPasswordPage />}
+			/>
+			<Route
+				path='/reset-password/:token'
+				element={<ResetPasswordPage />}
+			/>
 			{/* Protected Routes */}
 			<Route
-				path="/dashboard"
+				path='/dashboard'
 				element={
 					<ProtectedRoute>
 						<Dashboard />
@@ -46,7 +65,7 @@ function App() {
 			/>
 
 			<Route
-				path="/child-profile"
+				path='/child-profile'
 				element={
 					<ProtectedRoute>
 						<ChildProfile />
@@ -55,7 +74,7 @@ function App() {
 			/>
 
 			<Route
-				path="/group-chat"
+				path='/group-chat'
 				element={
 					<ProtectedRoute>
 						<GroupChat />
@@ -64,7 +83,7 @@ function App() {
 			/>
 
 			<Route
-				path="/group-chat/:roomId"
+				path='/group-chat/:roomId'
 				element={
 					<ProtectedRoute>
 						<GroupChat />
@@ -73,7 +92,7 @@ function App() {
 			/>
 
 			<Route
-				path="/village-people"
+				path='/village-people'
 				element={
 					<ProtectedRoute>
 						<VillagePeople />
@@ -82,7 +101,7 @@ function App() {
 			/>
 
 			<Route
-				path="/wishlist"
+				path='/wishlist'
 				element={
 					<ProtectedRoute>
 						<MyWishlist />
@@ -91,10 +110,21 @@ function App() {
 			/>
 
 			{/* Root redirect */}
-			<Route path="/" element={<RootRedirect />} />
+			<Route
+				path='/'
+				element={<RootRedirect />}
+			/>
 
 			{/* Catch-all */}
-			<Route path="*" element={<Navigate replace to="/login" />} />
+			<Route
+				path='*'
+				element={
+					<Navigate
+						replace
+						to='/login'
+					/>
+				}
+			/>
 		</Routes>
 	);
 }
