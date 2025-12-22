@@ -1,0 +1,324 @@
+/* Self Assignment Modal Styles */
+
+.modal-backdrop-self {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    z-index: 1040;
+    animation: fadeIn 0.3s ease;
+}
+
+.self-assignment-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    z-index: 1050;
+    animation: slideIn 0.3s ease;
+}
+
+.self-assignment-content {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+.modal-header-self {
+    background: linear-gradient(135deg, #2d5016, #4a7c2a);
+    color: white;
+    padding: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.modal-header-self h2 {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+}
+
+.modal-header-self p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+}
+
+.btn-close-self {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-close-self:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+.modal-body-self {
+    padding: 2rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.loading-section {
+    text-align: center;
+    padding: 3rem;
+    color: #666;
+}
+
+.loading-section i {
+    color: #2d5016;
+    margin-bottom: 1rem;
+}
+
+.current-assignment-notice {
+    background: linear-gradient(135deg, #e3f2fd, #f1f8e9);
+    border-left: 4px solid #2d5016;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    color: #2d5016;
+}
+
+.participants-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.participant-card {
+    background: white;
+    border: 3px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.participant-card:hover:not(.disabled) {
+    border-color: #2d5016;
+    box-shadow: 0 8px 20px rgba(45, 80, 22, 0.2);
+    transform: translateY(-5px);
+}
+
+.participant-card.selected {
+    border-color: #2d5016;
+    background: linear-gradient(135deg, #f1f8e9, #e8f5e9);
+    box-shadow: 0 8px 20px rgba(45, 80, 22, 0.3);
+}
+
+.participant-card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f5f5f5;
+}
+
+.participant-avatar {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+    position: relative;
+}
+
+.participant-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #e0e0e0;
+}
+
+.participant-card.selected .participant-avatar img,
+.participant-card.selected .avatar-placeholder {
+    border-color: #2d5016;
+}
+
+.avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #e0e0e0, #bdbdbd);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    border: 3px solid #e0e0e0;
+}
+
+.participant-info h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: #333;
+}
+
+.participant-info .badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.selected-indicator {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #2d5016;
+    color: white;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    animation: pop 0.3s ease;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #999;
+}
+
+.modal-footer-self {
+    background: #f8f9fa;
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.modal-footer-self .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.modal-footer-self .btn-secondary {
+    background: #6c757d;
+    border: none;
+    color: white;
+}
+
+.modal-footer-self .btn-secondary:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+.modal-footer-self .btn-success {
+    background: linear-gradient(135deg, #2d5016, #4a7c2a);
+    border: none;
+    color: white;
+}
+
+.modal-footer-self .btn-success:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(45, 80, 22, 0.3);
+}
+
+.modal-footer-self .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -60%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+@keyframes pop {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .self-assignment-modal {
+        width: 95%;
+    }
+
+    .modal-header-self {
+        padding: 1.5rem;
+    }
+
+    .modal-header-self h2 {
+        font-size: 1.25rem;
+    }
+
+    .modal-body-self {
+        padding: 1.5rem;
+    }
+
+    .participants-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .participant-card {
+        padding: 1rem 0.75rem;
+    }
+
+    .participant-avatar {
+        width: 60px;
+        height: 60px;
+    }
+
+    .modal-footer-self {
+        padding: 1rem 1.5rem;
+        flex-direction: column;
+    }
+
+    .modal-footer-self .btn {
+        width: 100%;
+    }
+}

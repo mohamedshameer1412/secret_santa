@@ -29,19 +29,13 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 		theme: "christmas",
 		anonymousMode: true,
 		organizer: null,
+		assignmentStrategy: "auto-roll",
 	});
 
-	useEffect(() => {
-		if (isOpen) {
-			setActiveTab("general");
-		}
-	}, [isOpen]);
-
+	// Fetch room data on modal open
 	useEffect(() => {
 		const fetchRoomData = async () => {
-			if (!isOpen || !roomId) {
-				return;
-			}
+			if (!isOpen || !roomId) return;
 
 			setLoading(true);
 			try {
@@ -75,6 +69,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 					theme: room.theme || "christmas",
 					anonymousMode: room.anonymousMode !== false,
 					organizer: room.organizer,
+					assignmentStrategy: room.assignmentStrategy || "auto-roll",
 				});
 			} catch (error) {
 				alert(
@@ -211,6 +206,102 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				text:
 					error.response?.data?.message ||
 					"Could not draw names. Please try again.",
+				confirmButtonColor: "#cc0000",
+			});
+		} finally {
+			setDrawing(false);
+		}
+	};
+
+	const handleSaveManualAssignments = async () => {
+		setDrawing(true);
+		try {
+			// Collect all assignments from dropdowns
+			const pairings = [];
+			const receiverIds = new Set();
+			let hasError = false;
+			let errorMessage = "";
+
+			for (const participant of participants) {
+				const selectElement = document.getElementById(
+					`receiver-${participant._id}`
+				);
+				const receiverId = selectElement?.value;
+
+				if (!receiverId) {
+					hasError = true;
+					errorMessage = `Please select a recipient for ${
+						participant.username || participant.name
+					}`;
+					break;
+				}
+
+				if (receiverIds.has(receiverId)) {
+					hasError = true;
+					errorMessage =
+						"Each participant can only be assigned as a recipient once";
+					break;
+				}
+
+				receiverIds.add(receiverId);
+				pairings.push({
+					giver: participant._id,
+					receiver: receiverId,
+				});
+			}
+
+			if (hasError) {
+				await Swal.fire({
+					icon: "error",
+					title: "Invalid Assignments",
+					text: errorMessage,
+					confirmButtonColor: "#cc0000",
+				});
+				return;
+			}
+
+			// Validate all participants are assigned as receivers
+			if (receiverIds.size !== participants.length) {
+				await Swal.fire({
+					icon: "error",
+					title: "Incomplete Assignments",
+					text: "All participants must be assigned as recipients",
+					confirmButtonColor: "#cc0000",
+				});
+				return;
+			}
+
+			const token = localStorage.getItem("token");
+			await axios.post(
+				`http://localhost:5000/api/chat/${roomId}/manual-assign`,
+				{ pairings },
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+
+			await Swal.fire({
+				icon: "success",
+				title: "Assignments Saved!",
+				text: "Manual pairings have been successfully saved. Participants can now view their assignments.",
+				confirmButtonColor: "#2d5016",
+			});
+
+			// Refresh room data
+			const response = await axios.get(
+				`http://localhost:5000/api/chat/${roomId}`,
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+
+			const room = response.data.room || response.data;
+			setParticipants(room.participants || []);
+			setRoomStatus(room.status || "waiting");
+		} catch (error) {
+			console.error("Error saving manual assignments:", error);
+			await Swal.fire({
+				icon: "error",
+				title: "Save Failed",
+				text:
+					error.response?.data?.message ||
+					"Could not save manual assignments. Please try again.",
 				confirmButtonColor: "#cc0000",
 			});
 		} finally {
@@ -697,6 +788,63 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 													</option>
 												</select>
 											</div>
+
+											<div className='form-group mb-3'>
+												<label
+													className='form-label'
+													style={{
+														color: "#fff",
+														display: "block",
+														marginBottom: "10px",
+													}}
+												>
+													<i className='fas fa-cogs me-2'></i>
+													Assignment Strategy
+												</label>
+												<select
+													name='assignmentStrategy'
+													className='form-control glass-input'
+													value={roomData.assignmentStrategy}
+													onChange={handleInputChange}
+													disabled={roomStatus === "drawn"}
+													style={{
+														background: "rgba(255,255,255,0.1)",
+														color: "#fff",
+														border: "1px solid rgba(255,215,0,0.3)",
+														padding: "10px",
+														borderRadius: "8px",
+													}}
+												>
+													<option
+														value='auto-roll'
+														style={{ background: "#1a1a2e", color: "#fff" }}
+													>
+														🎲 Auto-Roll (System assigns on draw date)
+													</option>
+													<option
+														value='manual'
+														style={{ background: "#1a1a2e", color: "#fff" }}
+													>
+														👤 Manual (Organizer assigns pairs)
+													</option>
+													<option
+														value='self-assign'
+														style={{ background: "#1a1a2e", color: "#fff" }}
+													>
+														✋ Self-Assign (Users pick their recipient)
+													</option>
+												</select>
+												<small className='text-muted d-block mt-1'>
+													{roomData.assignmentStrategy === "auto-roll" &&
+														"System will automatically create pairings on the draw date"}
+													{roomData.assignmentStrategy === "manual" &&
+														"You can manually assign who gives to whom in the Management tab"}
+													{roomData.assignmentStrategy === "self-assign" &&
+														"Users will select their own recipient after physical draw"}
+													{roomStatus === "drawn" &&
+														" (Cannot change after assignments are made)"}
+												</small>
+											</div>
 										</div>
 									</div>
 								)}
@@ -821,15 +969,15 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 																		{participant.username || participant.name}
 																		{participant._id ===
 																			roomData.organizer?._id && (
-                                                                                <span className="badge-organizer">
-                                                                                    <span className="crown-icon">👑</span>
+																			<span className='badge-organizer'>
+																				<span className='crown-icon'>👑</span>
 
-                                                                                    <span className="organizer-text-wrapper">
-                                                                                        <span className="organizer-text">
-                                                                                            Organizer
-                                                                                        </span>
-                                                                                    </span>
-                                                                                </span>
+																				<span className='organizer-text-wrapper'>
+																					<span className='organizer-text'>
+																						Organizer
+																					</span>
+																				</span>
+																			</span>
 																		)}
 																	</div>
 																	<div className='participant-email'>
@@ -874,7 +1022,7 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 											>
 												<i className='fas fa-crown me-2'></i>Organizer Controls
 											</h5>
-											<p className='text-muted mb-4'>
+											<p className='text-white mb-4'>
 												Manage your Secret Santa event and draw names
 											</p>
 
@@ -955,6 +1103,90 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 													)}
 												</div>
 											</div>
+
+											{/* Manual Assignment Section - Only show if room uses manual strategy */}
+											{roomData.assignmentStrategy === "manual" && (
+												<div className='management-section mb-4'>
+													<h6 className='mb-3'>
+														<i className='fas fa-users-cog me-2'></i>
+														Manual Pairing Assignment
+													</h6>
+													<p className='text-muted small mb-3'>
+														Manually assign who gives gifts to whom. Each
+														participant must be assigned exactly once as both
+														giver and receiver.
+													</p>
+
+													{roomStatus !== "drawn" ? (
+														<div className='manual-assignment-grid'>
+															{participants.map((participant) => (
+																<div
+																	key={participant._id}
+																	className='assignment-row'
+																>
+																	<div className='giver-info'>
+																		<img
+																			src={
+																				participant.profilePic ||
+																				"/assets/default-avatar.png"
+																			}
+																			alt={participant.username}
+																			className='participant-mini-avatar'
+																		/>
+																		<span>
+																			{participant.username || participant.name}
+																		</span>
+																	</div>
+																	<i className='fas fa-arrow-right mx-2'></i>
+																	<select
+																		className='form-select form-select-sm receiver-select'
+																		defaultValue=''
+																		id={`receiver-${participant._id}`}
+																	>
+																		<option value=''>
+																			Select recipient...
+																		</option>
+																		{participants
+																			.filter((p) => p._id !== participant._id)
+																			.map((p) => (
+																				<option
+																					key={p._id}
+																					value={p._id}
+																				>
+																					{p.username || p.name}
+																				</option>
+																			))}
+																	</select>
+																</div>
+															))}
+
+															<button
+																className='btn btn-success w-100 mt-3'
+																onClick={handleSaveManualAssignments}
+																disabled={drawing}
+															>
+																{drawing ? (
+																	<>
+																		<i className='fas fa-spinner fa-spin me-2'></i>
+																		Saving...
+																	</>
+																) : (
+																	<>
+																		<i className='fas fa-save me-2'></i>
+																		Save Manual Assignments
+																	</>
+																)}
+															</button>
+														</div>
+													) : (
+														<div className='alert alert-success'>
+															<i className='fas fa-check-circle me-2'></i>
+															Manual assignments have been saved. Use "Reset
+															Assignments" to make changes.
+														</div>
+													)}
+												</div>
+											)}
 
 											{/* Room Details Section */}
 											<div className='management-section mb-4'>

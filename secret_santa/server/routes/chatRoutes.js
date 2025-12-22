@@ -220,7 +220,7 @@ router.get(
 		})
 			.populate("organizer", "username profilePic email")
 			.select(
-				"name description organizer participants maxParticipants theme drawDate status roomType anonymousMode messages createdAt"
+				"name description organizer participants maxParticipants theme drawDate status roomType anonymousMode messages createdAt assignmentStrategy"
 			)
 			.sort({ createdAt: -1 });
 
@@ -1572,8 +1572,8 @@ router.post(
 );
 
 // @route   POST /api/chat/:roomId/draw-names
-// @desc    Automatically draw Secret Santa pairings (Fisher-Yates shuffle)
-// @access  Private (Organizer only)
+// @desc    Automatically draw Secret Santa pairings (Fisher-Yates shuffle) - supports auto-roll and manual strategies
+// @access  Private (Organizer only for manual, any participant for auto-roll if date passed)
 router.post(
 	"/:roomId/draw-names",
 	protect,
@@ -1590,14 +1590,48 @@ router.post(
 			throw new AppError("Room not found", 404);
 		}
 
-		// Check if user is organizer
-		if (room.organizer.toString() !== userId) {
-			throw new AppError("Only the organizer can draw names", 403);
-		}
-
-		// Check if room is Secret Santa type
+		// Check room type
 		if (room.roomType !== "secret-santa") {
 			throw new AppError("This room is not a Secret Santa room", 400);
+		}
+
+		// Check strategy-specific permissions
+		if (room.assignmentStrategy === "auto-roll") {
+			// For auto-roll, check if draw date has passed
+			if (!room.drawDate) {
+				throw new AppError("Draw date not set for this room", 400);
+			}
+
+			const now = new Date();
+			const drawDate = new Date(room.drawDate);
+
+			if (now < drawDate) {
+				throw new AppError(
+					`Names can only be drawn on or after ${drawDate.toLocaleDateString()}`,
+					403
+				);
+			}
+
+			// Check if user is participant
+			const isParticipant = room.participants.some(
+				(p) => p._id.toString() === userId
+			);
+			if (!isParticipant) {
+				throw new AppError("You are not a participant in this room", 403);
+			}
+		} else if (room.assignmentStrategy === "manual") {
+			// For manual, only organizer can draw
+			if (room.organizer.toString() !== userId) {
+				throw new AppError(
+					"Only the organizer can draw names in manual mode",
+					403
+				);
+			}
+		} else if (room.assignmentStrategy === "self-assign") {
+			throw new AppError(
+				"This room uses self-assignment. Use the self-assign endpoint instead.",
+				400
+			);
 		}
 
 		// Check minimum participants (at least 3 for meaningful Secret Santa)
@@ -1667,6 +1701,205 @@ router.post(
 			success: true,
 			message: "Secret Santa pairings have been drawn!",
 			participantCount: participantIds.length,
+		});
+	})
+);
+
+// @route   POST /api/chat/:roomId/manual-assign
+// @desc    Manual assignment of Secret Santa pairs by organizer
+// @access  Private (Organizer only)
+router.post(
+	"/:roomId/manual-assign",
+	protect,
+	asyncHandler(async (req, res) => {
+		const { roomId } = req.params;
+		const userId = req.user.id;
+		const { pairings } = req.body;
+
+		const room = await ChatRoom.findById(roomId).populate(
+			"participants",
+			"username email profilePic"
+		);
+
+		if (!room) {
+			throw new AppError("Room not found", 404);
+		}
+
+		// Check if user is organizer
+		if (room.organizer.toString() !== userId) {
+			throw new AppError("Only the organizer can manually assign pairs", 403);
+		}
+
+		// Check strategy
+		if (room.assignmentStrategy !== "manual") {
+			throw new AppError("This room is not set to manual assignment mode", 400);
+		}
+
+		// Validate pairings format
+		if (!Array.isArray(pairings) || pairings.length === 0) {
+			throw new AppError("Invalid pairings format", 400);
+		}
+
+		// Validate all participants are assigned exactly once as giver
+		const participantIds = room.participants.map((p) => p._id.toString());
+		const giverIds = pairings.map((p) => p.giver);
+		const receiverIds = pairings.map((p) => p.receiver);
+
+		// Check all participants are givers
+		const missingGivers = participantIds.filter((id) => !giverIds.includes(id));
+		if (missingGivers.length > 0) {
+			throw new AppError("All participants must be assigned as givers", 400);
+		}
+
+		// Check no duplicate givers
+		const uniqueGivers = [...new Set(giverIds)];
+		if (uniqueGivers.length !== giverIds.length) {
+			throw new AppError("Duplicate givers found", 400);
+		}
+
+		// Check all participants are receivers
+		const missingReceivers = participantIds.filter(
+			(id) => !receiverIds.includes(id)
+		);
+		if (missingReceivers.length > 0) {
+			throw new AppError("All participants must be assigned as receivers", 400);
+		}
+
+		// Check no duplicate receivers
+		const uniqueReceivers = [...new Set(receiverIds)];
+		if (uniqueReceivers.length !== receiverIds.length) {
+			throw new AppError("Duplicate receivers found", 400);
+		}
+
+		// Check no one is assigned to themselves
+		for (const pairing of pairings) {
+			if (pairing.giver === pairing.receiver) {
+				throw new AppError(
+					"A participant cannot be their own Secret Santa",
+					400
+				);
+			}
+		}
+
+		// Update room
+		room.pairings = pairings;
+		room.status = "drawn";
+		await room.save();
+
+		res.json({
+			success: true,
+			message: "Manual pairings saved successfully!",
+			participantCount: pairings.length,
+		});
+	})
+);
+
+// @route   POST /api/chat/:roomId/self-assign
+// @desc    User self-assigns their Secret Santa recipient
+// @access  Private
+router.post(
+	"/:roomId/self-assign",
+	protect,
+	asyncHandler(async (req, res) => {
+		const { roomId } = req.params;
+		const userId = req.user.id;
+		const { receiverId } = req.body;
+
+		const room = await ChatRoom.findById(roomId).populate(
+			"participants",
+			"username email profilePic"
+		);
+
+		if (!room) {
+			throw new AppError("Room not found", 404);
+		}
+
+		// Check if user is participant
+		const isParticipant = room.participants.some(
+			(p) => p._id.toString() === userId
+		);
+		if (!isParticipant) {
+			throw new AppError("You are not a participant in this room", 403);
+		}
+
+		// Check strategy
+		if (room.assignmentStrategy !== "self-assign") {
+			throw new AppError("This room is not set to self-assignment mode", 400);
+		}
+
+		// Validate receiverId
+		if (!receiverId) {
+			throw new AppError("Receiver ID is required", 400);
+		}
+
+		// Check receiver is a participant
+		const receiverIsParticipant = room.participants.some(
+			(p) => p._id.toString() === receiverId
+		);
+		if (!receiverIsParticipant) {
+			throw new AppError("Selected recipient is not a participant", 400);
+		}
+
+		// Check user is not assigning themselves
+		if (userId === receiverId) {
+			throw new AppError("You cannot be your own Secret Santa", 400);
+		}
+
+		// Check if receiver already assigned to someone else
+		const existingPairing = room.pairings.find(
+			(p) =>
+				p.receiver.toString() === receiverId && p.giver.toString() !== userId
+		);
+		if (existingPairing) {
+			throw new AppError(
+				"This recipient has already been chosen by someone else",
+				409
+			);
+		}
+
+		// Check if user already has an assignment
+		const userPairingIndex = room.pairings.findIndex(
+			(p) => p.giver.toString() === userId
+		);
+
+		if (userPairingIndex !== -1) {
+			// Update existing assignment
+			room.pairings[userPairingIndex].receiver = receiverId;
+		} else {
+			// Create new assignment
+			room.pairings.push({
+				giver: userId,
+				receiver: receiverId,
+			});
+		}
+
+		// Check if all participants have assigned
+		const allAssigned = room.participants.every((p) =>
+			room.pairings.some(
+				(pairing) => pairing.giver.toString() === p._id.toString()
+			)
+		);
+
+		if (allAssigned) {
+			room.status = "drawn";
+		}
+
+		await room.save();
+
+		// Get receiver details
+		const receiver = room.participants.find(
+			(p) => p._id.toString() === receiverId
+		);
+
+		res.json({
+			success: true,
+			message: "Assignment saved successfully!",
+			assignment: {
+				receiverId: receiver._id,
+				receiverName: receiver.username,
+				receiverProfilePic: receiver.profilePic,
+			},
+			allAssigned,
 		});
 	})
 );

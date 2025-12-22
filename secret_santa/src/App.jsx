@@ -65,7 +65,7 @@ function App() {
 			/>
 
 			<Route
-				path='/child-profile'
+				path='/child-profile/:roomId'
 				element={
 					<ProtectedRoute>
 						<ChildProfile />

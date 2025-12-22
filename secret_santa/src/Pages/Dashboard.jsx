@@ -1,467 +1,481 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from '../context/useAuth';
-import axios from 'axios';
-import Navbar from '../Components/Navbar';
-import Sidebar from '../Components/Sidebar';
+import { useAuth } from "../context/useAuth";
+import axios from "axios";
+import Navbar from "../Components/Navbar";
+import Sidebar from "../Components/Sidebar";
+import Swal from "sweetalert2";
 
-const API_URL = 'http://localhost:5000/api/children';
+const API_URL = "http://localhost:5000/api/chat";
 
-const ChildReveal = () => {
-  const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
-  
-  const [names, setNames] = useState([]);
-  const [selectedIndex, setSelectedIndex] = useState(null);
-  const [drawStarted, setDrawStarted] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+const Dashboard = () => {
+	const { user, loading: authLoading } = useAuth();
+	const navigate = useNavigate();
 
-  const backdropRef = useRef(null);
-  const ITEM_HEIGHT = 120;
+	const [rooms, setRooms] = useState([]);
+	const [sidebarOpen, setSidebarOpen] = useState(false);
+	const [loading, setLoading] = useState(true);
+	const [revealingRoom, setRevealingRoom] = useState(null);
 
-  // Fetch stats on mount
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (authLoading) return;
-      
-      if (!user) {
-        navigate('/login');
-        return;
-      }
+	// Fetch user's Secret Santa rooms on mount
+	useEffect(() => {
+		const fetchRooms = async () => {
+			if (authLoading) return;
 
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${API_URL}/stats`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        setStats(res.data.stats);
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+			if (!user) {
+				navigate("/login");
+				return;
+			}
 
-    fetchStats();
-  }, [authLoading, user, navigate]);
+			try {
+				const token = localStorage.getItem("token");
+				const res = await axios.get(`${API_URL}/my-rooms`, {
+					headers: { Authorization: `Bearer ${token}` },
+				});
 
-  // Load available names for slot machine
-  useEffect(() => {
-    // You can fetch from backend or use predefined list
-    const childNames = ["Aryan", "Meena", "Ravi", "Lila", "Nisha", "Ayaan", "Priya", "Rohan"];
-    setNames(childNames);
-  }, []);
+				// Filter only Secret Santa rooms
+				const secretSantaRooms = res.data.rooms.filter(
+					(room) => room.roomType === "secret-santa"
+				);
 
-  useEffect(() => {
-    if (!showModal || !backdropRef.current) return;
+				setRooms(secretSantaRooms);
+			} catch (error) {
+				console.error("Error fetching rooms:", error);
+				if (error.response?.status === 401) {
+					navigate("/login");
+				}
+			} finally {
+				setLoading(false);
+			}
+		};
 
-    for (let i = 0; i < 100; i++) {
-      const flake = document.createElement("div");
-      flake.className = "snowflake";
-      flake.style.left = `${Math.random() * 100}vw`;
-      flake.style.animationDelay = `${Math.random() * 6}s`;
-      flake.style.animationDuration = `${4 + Math.random() * 4}s`;
-      backdropRef.current.appendChild(flake);
+		fetchRooms();
+	}, [authLoading, user, navigate]);
 
-      flake.addEventListener("animationend", () => {
-        flake.remove();
-      });
-    }
-  }, [showModal]);
+	const handleRevealAssignment = async (roomId) => {
+		try {
+			setRevealingRoom(roomId);
+			const token = localStorage.getItem("token");
 
-    const handleDraw = async () => {
-        if (drawStarted) return;
-        setDrawStarted(true);
+			// First, trigger the draw if room uses auto-roll
+			const room = rooms.find((r) => r._id === roomId);
+			if (room.assignmentStrategy === "auto-roll" && room.status !== "drawn") {
+				await axios.post(
+					`${API_URL}/${roomId}/draw-names`,
+					{},
+					{ headers: { Authorization: `Bearer ${token}` } }
+				);
+			}
 
-        const chosenIdx = Math.floor(Math.random() * names.length);
-        setSelectedIndex(chosenIdx);
+			// Get the assignment
+			const res = await axios.get(`${API_URL}/${roomId}/my-assignment`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
 
-        const sound = new Audio("/sounds/reveal.mp3");
-        sound.play().catch(() => {}); // Ignore sound errors
+			const assignment = res.data.assignment;
 
-        // Call backend API to reveal child
-        try {
-            const token = localStorage.getItem('token');
-            const res = await axios.post(`${API_URL}/reveal`, {}, {
-            headers: { Authorization: `Bearer ${token}` }
-            });
-
-            // Check if it's an existing child
-            if (res.data.alreadyRevealed) {
-            // Show existing child immediately
-            setTimeout(() => {
-                navigate("/child-profile");
-            }, 2000);
-            } else {
-            // New child - show full animation
-            setTimeout(() => {
-                navigate("/child-profile");
-            }, 3500);
-            }
-        } catch (error) {
-            console.error('Error revealing child:', error);
-            
-            if (error.response?.status === 401) {
-                navigate('/login');
-                return;
-            }
-            
-            alert('Failed to reveal child. Please try again.');
-            setDrawStarted(false);
-            setShowModal(false);
-        }
-    };
-
-  const finalIndex = selectedIndex !== null ? selectedIndex + names.length : 0;
-  const translateY = -finalIndex * ITEM_HEIGHT;
-
-  if (authLoading || loading) {
-    return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="spinner-border text-danger" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="d-flex flex-column w-100 vh-100">
-      <Navbar toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-      <Sidebar isOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-      <main
-        className={`content ${sidebarOpen ? '' : 'shifted'} py-4 px-3 px-md-5 mt-5`}
-        style={{ minHeight: 'calc(100vh - 56px)' }}
-      >
-        {!showModal && (
-          <>
-            <div className="text-center mb-4">
-              <h1 className="fw-bold text-danger mb-2">Welcome to the Child Reveal Dashboard</h1>
-              <p className="text-muted fs-5">
-                Generate a secret child or review your profile below.
-              </p>
-            </div>
-
-            <div className="row justify-content-center g-4 mb-5">
-              <div className="col-12 col-md-4">
-                <div className="card shadow-sm border-danger h-100">
-                  <div className="card-body d-flex align-items-center gap-3">
-                    <i className="bi bi-people-fill fs-1 text-danger"></i>
-                    <div>
-                      <h5 className="card-title mb-1">Total Children</h5>
-                      <p className="card-text fs-4 fw-semibold mb-0">
-                        {stats?.totalChildren || 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-12 col-md-4">
-                <div className="card shadow-sm border-danger h-100">
-                  <div className="card-body d-flex align-items-center gap-3">
-                    <i className="bi bi-clock-history fs-1 text-danger"></i>
-                    <div>
-                      <h5 className="card-title mb-1">Last Generated</h5>
-                      <p className="card-text fs-6 text-muted mb-0">
-                        {stats?.lastRevealed 
-                          ? new Date(stats.lastRevealed).toLocaleDateString()
-                          : 'Never'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-12 col-md-4">
-                <div className="card shadow-sm border-danger h-100">
-                  <div className="card-body d-flex align-items-center gap-3">
-                    <i className="bi bi-lightbulb-fill fs-1 text-danger"></i>
-                    <div>
-                      <h5 className="card-title mb-1">Clues Revealed</h5>
-                      <p className="card-text fs-4 fw-semibold mb-0">
-                        {stats?.totalCluesRevealed || 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="d-flex justify-content-center">
-              <button
-                className="btn btn-danger btn-lg rounded-pill px-5 shadow"
-                onClick={() => setShowModal(true)}
-                aria-label="Open generate child modal"
-              >
-                <i className="bi bi-rocket-fill me-2"></i>
-                Generate Child
-              </button>
-            </div>
-          </>
-        )}
-      </main>
-
-
-      {showModal && (
-        <>
-          <div
-            ref={backdropRef}
-            className="modal-backdrop fade show position-fixed top-0 start-0 w-100 h-100"
-            style={{
-              backgroundColor: "rgba(0,0,0,0.5)",
-              zIndex: 1040,
-              overflow: "hidden",
-            }}
-            onClick={() => !drawStarted && setShowModal(false)}
-            aria-hidden="true"
-          />
-
-          <div
-            className="modal fade show d-block"
-            tabIndex="-1"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="childRevealModalLabel"
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "100vw",
-              height: "100vh",
-              overflowY: "auto",
-              zIndex: 1050,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              padding: "1rem",
-            }}
-          >
-            <div className="modal-dialog modal-dialog-centered" role="document">
-              <div className="modal-content bg-dark text-white rounded-4 shadow-lg position-relative overflow-hidden">
-                <div className="modal-header border-0">
-                  <h5 className="modal-title fw-bold" id="childRevealModalLabel">
-                    Pull the Lever to Reveal Your Secret Child
-                  </h5>
-                  <button
-                    type="button"
-                    className="btn-close btn-close-white"
-                    aria-label="Close"
-                    onClick={() => {
-                      if (!drawStarted) {
-                        setShowModal(false);
-                        setSelectedIndex(null);
-                      }
-                    }}
-                    disabled={drawStarted}
-                  />
-                </div>
-
-                <div className="modal-body d-flex flex-column align-items-center">
-                  <div
-                    className="glassmorph slot-box mb-4 position-relative w-100"
-                    aria-live="polite"
-                    aria-atomic="true"
-                    style={{ maxWidth: "360px", height: `${ITEM_HEIGHT}px` }}
-                  >
-                    <div
-                      className="reel"
-                      style={{
-                        transform: drawStarted ? `translateY(${translateY}px)` : "translateY(0)",
-                        transition: drawStarted
-                          ? "transform 2.5s cubic-bezier(0.4, 0, 0.2, 1)"
-                          : "none",
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        willChange: "transform",
-                      }}
-                      aria-hidden={false}
-                    >
-                      {names.concat(names).map((name, index) => {
-                        const isSelected = selectedIndex !== null && index === finalIndex;
-                        return (
-                          <div
-                            className={`reel-name${isSelected ? " selected" : ""}`}
-                            key={index}
-                            aria-current={isSelected ? "true" : undefined}
-                          >
-                            {name}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <button
-                    className={`lever-button btn btn-danger shadow${drawStarted ? " started" : ""} mt-2 d-flex align-items-center gap-2`}
-                    onClick={handleDraw}
-                    disabled={drawStarted}
-                    title="Pull the lever"
-                    aria-pressed={drawStarted}
-                    aria-label="Pull the lever to reveal the secret child"
-                  >
-                    <i className="fas fa-level-down-alt fa-2x"></i>
-                    <span className="button-text">{drawStarted ? "Revealing..." : "Generate Child"}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+			// Show assignment with festive animation
+			await Swal.fire({
+				title: "🎁 Your Secret Santa Assignment!",
+				html: `
+          <div style="text-align: center;">
+            <img 
+              src="${
+								assignment.receiverProfilePic || "/assets/default-avatar.png"
+							}" 
+              alt="${assignment.receiverName}"
+              style="width: 100px; height: 100px; border-radius: 50%; margin: 20px auto; border: 4px solid #2d5016;"
+            />
+            <h3 style="color: #2d5016; margin: 15px 0;">${
+							assignment.receiverName
+						}</h3>
+            <p style="font-size: 1.1rem; color: #666;">
+              You are the Secret Santa for <strong>${
+								assignment.receiverName
+							}</strong>!
+            </p>
+            <p style="color: #888; margin-top: 10px;">
+              Gift Budget: <strong>$${assignment.giftBudget}</strong>
+            </p>
           </div>
-        </>
-      )}
+        `,
+				icon: "success",
+				confirmButtonText: "Got it!",
+				confirmButtonColor: "#2d5016",
+				allowOutsideClick: false,
+			});
 
-      <style>{`
-        :root {
-          --green: #28a745;
-          --light-red: #ff4d4d;
-          --dark-red: #a30000;
-          --white: #ffffff;
-          --medium-red: #cc0000;
-        }
+			// Refresh rooms to update status
+			const updatedRes = await axios.get(`${API_URL}/my-rooms`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			const secretSantaRooms = updatedRes.data.rooms.filter(
+				(room) => room.roomType === "secret-santa"
+			);
+			setRooms(secretSantaRooms);
+		} catch (error) {
+			console.error("Error revealing assignment:", error);
 
-        .glassmorph {
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          backdrop-filter: blur(10px);
-          border-radius: 20px;
-          padding: 1.5rem;
-          max-width: 360px;
-          width: 90%;
-          box-shadow: 0 0 20px rgba(0, 0, 0, 0.35);
-          overflow: hidden;
-          position: relative;
-          height: ${ITEM_HEIGHT}px;
-        }
+			Swal.fire({
+				icon: "error",
+				title: "Oops!",
+				text:
+					error.response?.data?.message ||
+					"Failed to reveal assignment. Please try again.",
+				confirmButtonColor: "#2d5016",
+			});
+		} finally {
+			setRevealingRoom(null);
+		}
+	};
 
-        .slot-box {
-          position: relative;
-          height: ${ITEM_HEIGHT}px;
-          overflow: hidden;
-        }
+	const getAssignmentStatusBadge = (room) => {
+		if (room.status === "drawn") {
+			return <span className='badge bg-success'>✓ Drawn</span>;
+		}
 
-        .reel {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          will-change: transform;
-        }
+		if (room.assignmentStrategy === "auto-roll") {
+			if (!room.drawDate) {
+				return <span className='badge bg-secondary'>No Draw Date</span>;
+			}
 
-        .reel-name {
-          height: ${ITEM_HEIGHT}px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          font-size: 2rem;
-          color: var(--white);
-          font-weight: 700;
-          text-shadow: 0 0 5px rgba(0,0,0,0.5);
-          user-select: none;
-          transition: background-color 0.5s ease, color 0.5s ease, text-shadow 0.5s ease;
-          border-radius: 12px;
-          margin: 0 1rem;
-        }
+			const now = new Date();
+			const drawDate = new Date(room.drawDate);
 
-        .reel-name.selected {
-          background-color: var(--white);
-          color: var(--dark-red);
-          font-weight: 900;
-          text-shadow: none;
-          box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
-          transition: background-color 0.7s ease, color 0.7s ease, box-shadow 0.7s ease;
-        }
+			if (now >= drawDate) {
+				return <span className='badge bg-primary'>🎲 Ready to Reveal</span>;
+			} else {
+				return (
+					<span className='badge bg-warning text-dark'>
+						⏳ Waiting for {drawDate.toLocaleDateString()}
+					</span>
+				);
+			}
+		} else if (room.assignmentStrategy === "manual") {
+			return (
+				<span className='badge bg-info text-dark'>👤 Manual Assignment</span>
+			);
+		} else if (room.assignmentStrategy === "self-assign") {
+			return (
+				<span className='badge bg-purple text-white'>✋ Self-Assignment</span>
+			);
+		}
 
-        .lever-button {
-          background-color: var(--medium-red);
-          border: 3px solid var(--white);
-          border-radius: 50px;
-          padding: 0.6rem 1.5rem;
-          color: var(--white);
-          transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 0.8rem;
-          font-weight: 600;
-          font-size: 1.1rem;
-          user-select: none;
-          box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-          min-width: 180px;
-        }
+		return <span className='badge bg-secondary'>Waiting</span>;
+	};
 
-        .lever-button i {
-          transition: transform 0.3s ease;
-        }
+	const canReveal = (room) => {
+		if (room.status === "drawn") return true;
 
-        .lever-button:hover:not(:disabled) {
-          background-color: var(--dark-red);
-          box-shadow: 0 8px 16px rgba(0,0,0,0.4);
-        }
+		if (room.assignmentStrategy === "auto-roll") {
+			if (!room.drawDate) return false;
+			const now = new Date();
+			const drawDate = new Date(room.drawDate);
+			return now >= drawDate;
+		}
 
-        .lever-button:disabled {
-          cursor: not-allowed;
-          opacity: 0.6;
-        }
+		return false;
+	};
 
-        .lever-button.started i {
-          animation: lever-spin 1.5s linear infinite;
-        }
+	if (authLoading || loading) {
+		return (
+			<div className='d-flex justify-content-center align-items-center vh-100'>
+				<div
+					className='spinner-border text-danger'
+					role='status'
+				>
+					<span className='visually-hidden'>Loading...</span>
+				</div>
+			</div>
+		);
+	}
 
-        @keyframes lever-spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
+	return (
+		<div className='d-flex flex-column w-100 vh-100'>
+			<Navbar toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+			<Sidebar
+				isOpen={sidebarOpen}
+				setSidebarOpen={setSidebarOpen}
+			/>
 
-        .button-text {
-          display: inline-block;
-          transition: opacity 0.4s ease;
-          white-space: nowrap;
-        }
+			<main
+				className={`content ${
+					sidebarOpen ? "" : "shifted"
+				} py-4 px-3 px-md-5 mt-5`}
+				style={{ minHeight: "calc(100vh - 56px)" }}
+			>
+				<div className='text-center mb-4'>
+					<h1 className='fw-bold text-danger mb-2'>
+						🎄 Secret Santa Dashboard
+					</h1>
+					<p className='text-muted fs-5'>
+						View your Secret Santa rooms and reveal your assignments
+					</p>
+				</div>
 
-        .snowflake {
-          position: absolute;
-          top: -10px;
-          width: 8px;
-          height: 8px;
-          background: var(--white);
-          border-radius: 50%;
-          opacity: 0.8;
-          animation: snowFall 6s linear forwards;
-          filter: drop-shadow(0 0 1px rgba(255,255,255,0.8));
-        }
+				{/* Stats Cards */}
+				{rooms.length > 0 && (
+					<div className='row g-3 mb-4'>
+						<div className='col-6 col-md-3'>
+							<div
+								className='card border-0 shadow-lg'
+								style={{
+									background:
+										"linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+								}}
+							>
+								<div className='card-body text-white text-center'>
+									<i className='bi bi-gift-fill fs-1 mb-2'></i>
+									<h3 className='mb-0 fw-bold'>{rooms.length}</h3>
+									<small className='fw-semibold'>Total Rooms</small>
+								</div>
+							</div>
+						</div>
+						<div className='col-6 col-md-3'>
+							<div
+								className='card border-0 shadow-lg'
+								style={{
+									background:
+										"linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+								}}
+							>
+								<div className='card-body text-white text-center'>
+									<i className='bi bi-check-circle-fill fs-1 mb-2'></i>
+									<h3 className='mb-0 fw-bold'>
+										{rooms.filter((r) => r.status === "drawn").length}
+									</h3>
+									<small className='fw-semibold'>Drawn Rooms</small>
+								</div>
+							</div>
+						</div>
+						<div className='col-6 col-md-3'>
+							<div
+								className='card border-0 shadow-lg'
+								style={{
+									background:
+										"linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+								}}
+							>
+								<div className='card-body text-white text-center'>
+									<i className='bi bi-hourglass-split fs-1 mb-2'></i>
+									<h3 className='mb-0 fw-bold'>
+										{rooms.filter((r) => r.status !== "drawn").length}
+									</h3>
+									<small className='fw-semibold'>Pending</small>
+								</div>
+							</div>
+						</div>
+						<div className='col-6 col-md-3'>
+							<div
+								className='card border-0 shadow-lg'
+								style={{
+									background:
+										"linear-gradient(135deg, #f857a6 0%, #ff5858 100%)",
+								}}
+							>
+								<div className='card-body text-white text-center'>
+									<i className='bi bi-dice-5-fill fs-1 mb-2'></i>
+									<h3 className='mb-0 fw-bold'>
+										{
+											rooms.filter(
+												(r) =>
+													r.assignmentStrategy === "auto-roll" &&
+													canReveal(r) &&
+													r.status !== "drawn"
+											).length
+										}
+									</h3>
+									<small className='fw-semibold'>Ready to Roll</small>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
 
-        @keyframes snowFall {
-          0% {
-            transform: translateY(-10px);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(100vh);
-            opacity: 0;
-          }
-        }
+				{/* Roll Button for Auto-Roll Rooms */}
+				{rooms.filter(
+					(r) =>
+						r.assignmentStrategy === "auto-roll" &&
+						canReveal(r) &&
+						r.status !== "drawn"
+				).length > 0 && (
+					<div
+						className='alert alert-success shadow-sm border-0 mb-4'
+						style={{ borderLeft: "4px solid #28a745" }}
+					>
+						<div className='d-flex align-items-center justify-content-between flex-wrap gap-3'>
+							<div>
+								<h5 className='mb-1'>
+									<i className='bi bi-dice-5-fill me-2'></i>
+									Ready to Roll!
+								</h5>
+								<p className='mb-0 text-muted'>
+									The following rooms are ready for automatic assignment:
+									{rooms
+										.filter(
+											(r) =>
+												r.assignmentStrategy === "auto-roll" &&
+												canReveal(r) &&
+												r.status !== "drawn"
+										)
+										.map((room, idx, arr) => (
+											<span key={room._id}>
+												<strong className='text-success'>{room.name}</strong>
+												{idx < arr.length - 1 ? ", " : ""}
+											</span>
+										))}
+								</p>
+							</div>
+							<button
+								className='btn btn-success btn-lg'
+								onClick={() => {
+									const readyRoom = rooms.find(
+										(r) =>
+											r.assignmentStrategy === "auto-roll" &&
+											canReveal(r) &&
+											r.status !== "drawn"
+									);
+									if (readyRoom) handleRevealAssignment(readyRoom._id);
+								}}
+								disabled={revealingRoom !== null}
+							>
+								{revealingRoom !== null ? (
+									<>
+										<span className='spinner-border spinner-border-sm me-2'></span>
+										Rolling...
+									</>
+								) : (
+									<>
+										<i className='bi bi-dice-5-fill me-2'></i>
+										Roll & Reveal
+									</>
+								)}
+							</button>
+						</div>
+					</div>
+				)}
 
-        @media (max-width: 576px) {
-          .reel-name {
-            font-size: 1.5rem;
-          }
+				{rooms.length === 0 ? (
+					<div className='text-center py-5'>
+						<i className='bi bi-gift fs-1 text-muted mb-3'></i>
+						<p className='text-muted fs-5'>
+							You haven't joined any Secret Santa rooms yet.
+						</p>
+						<p className='text-muted'>
+							Create a room or join one using an invite code!
+						</p>
+					</div>
+				) : (
+					<div className='row g-4'>
+						{rooms.map((room) => (
+							<div
+								key={room._id}
+								className='col-12 col-md-6 col-lg-4'
+							>
+								<div
+									className='card h-100 shadow-sm border-0'
+									style={{
+										borderLeft: "4px solid #2d5016",
+										transition: "transform 0.2s",
+									}}
+								>
+									<div className='card-body'>
+										<div className='d-flex justify-content-between align-items-start mb-3'>
+											<h5 className='card-title mb-0 fw-bold'>{room.name}</h5>
+											{getAssignmentStatusBadge(room)}
+										</div>
 
-          .lever-button {
-            min-width: 140px;
-            font-size: 1rem;
-            padding: 0.5rem 1.2rem;
-          }
-        }
-      `}</style>
-    </div>
-  );
+										{room.description && (
+											<p className='card-text text-muted small mb-3'>
+												{room.description.length > 100
+													? room.description.substring(0, 100) + "..."
+													: room.description}
+											</p>
+										)}
+
+										<div className='mb-3'>
+											<div className='d-flex align-items-center mb-2'>
+												<i className='bi bi-people-fill me-2 text-success'></i>
+												<small className='text-muted'>
+													{room.participants?.length || 0} participants
+												</small>
+											</div>
+
+											{room.drawDate && (
+												<div className='d-flex align-items-center mb-2'>
+													<i className='bi bi-calendar-event me-2 text-primary'></i>
+													<small className='text-muted'>
+														Draw Date:{" "}
+														{new Date(room.drawDate).toLocaleDateString()}
+													</small>
+												</div>
+											)}
+
+											{room.giftBudget && (
+												<div className='d-flex align-items-center mb-2'>
+													<i className='bi bi-currency-dollar me-2 text-warning'></i>
+													<small className='text-muted'>
+														Budget: ${room.giftBudget}
+													</small>
+												</div>
+											)}
+
+											<div className='d-flex align-items-center'>
+												<i className='bi bi-gear-fill me-2 text-info'></i>
+												<small className='text-muted text-capitalize'>
+													{room.assignmentStrategy?.replace("-", " ")} Mode
+												</small>
+											</div>
+										</div>
+
+										<div className='d-flex gap-2 flex-wrap'>
+											<button
+												className='btn btn-sm btn-outline-success flex-grow-1'
+												onClick={() => navigate(`/group-chat/${room._id}`)}
+											>
+												<i className='bi bi-chat-dots me-1'></i>
+												Open Chat
+											</button>
+
+											{room.status === "drawn" && (
+												<button
+													className='btn btn-sm btn-outline-primary flex-grow-1'
+													onClick={() => navigate(`/child-profile/${room._id}`)}
+												>
+													<i className='bi bi-person-heart me-1'></i>
+													View Details
+												</button>
+											)}
+
+											{canReveal(room) && room.status !== "drawn" && (
+												<button
+													className='btn btn-sm btn-success'
+													onClick={() => handleRevealAssignment(room._id)}
+													disabled={revealingRoom === room._id}
+												>
+													{revealingRoom === room._id ? (
+														<span
+															className='spinner-border spinner-border-sm'
+															role='status'
+														></span>
+													) : (
+														<>
+															<i className='bi bi-gift me-1'></i>
+															Reveal
+														</>
+													)}
+												</button>
+											)}
+										</div>
+									</div>
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</main>
+		</div>
+	);
 };
 
-export default ChildReveal;
+export default Dashboard;

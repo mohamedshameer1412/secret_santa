@@ -91,6 +91,11 @@ const roomSchema = new mongoose.Schema({
 		type: Boolean,
 		default: false, // Default: organizer manually assigns pairs
 	},
+	assignmentStrategy: {
+		type: String,
+		enum: ["auto-roll", "manual", "self-assign"],
+		default: "auto-roll", // Auto-roll: system assigns on draw date; Manual: organizer assigns; Self-assign: users pick their own
+	},
 	theme: {
 		type: String,
 		enum: ["christmas", "winter", "festive", "elegant"],

@@ -6,6 +6,11 @@ const JoinWithCodeModal = ({ isOpen, onClose }) => {
 	const [inviteCode, setInviteCode] = useState("");
 	const navigate = useNavigate();
 
+	const handleClose = React.useCallback(() => {
+		setInviteCode("");
+		onClose();
+	}, [onClose]);
+
 	// Close modal on ESC key
 	useEffect(() => {
 		const handleEscape = (e) => {
@@ -23,12 +28,7 @@ const JoinWithCodeModal = ({ isOpen, onClose }) => {
 			document.removeEventListener("keydown", handleEscape);
 			document.body.style.overflow = "unset";
 		};
-	}, [isOpen]);
-
-	const handleClose = () => {
-		setInviteCode("");
-		onClose();
-	};
+	}, [isOpen, handleClose]);
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
