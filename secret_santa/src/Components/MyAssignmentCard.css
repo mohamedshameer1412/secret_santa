@@ -4,8 +4,10 @@
     backdrop-filter: blur(20px);
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 20px;
-    padding: 2rem;
-    margin: 1rem 0;
+    padding: 1.5rem;
+    margin: 0 auto;
+    max-width: 700px;
+    width: 100%;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
@@ -263,29 +265,55 @@
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
     .assignment-card {
-        padding: 1.5rem 1rem;
+        padding: 1rem;
+        margin: 0;
+        max-width: 100%;
+    }
+
+    .assignment-header {
+        margin-bottom: 1rem;
     }
 
     .assignment-header h3 {
-        font-size: 1.4rem;
+        font-size: 1.2rem;
+    }
+
+    .assignment-header i {
+        font-size: 1.5rem;
     }
 
     .receiver-name {
-        font-size: 1.6rem;
+        font-size: 1.4rem;
+    }
+
+    .receiver-avatar,
+    .receiver-avatar-placeholder {
+        width: 80px;
+        height: 80px;
+    }
+
+    .receiver-avatar-placeholder i {
+        font-size: 2rem;
     }
 
     .btn-reveal {
-        padding: 0.875rem 2rem;
-        font-size: 1rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 0.95rem;
     }
 
     .detail-row {
         flex-direction: column;
         text-align: center;
+        padding: 0.75rem;
     }
 
     .reminder-section {
         flex-direction: column;
         text-align: center;
+        padding: 0.75rem 1rem;
+    }
+
+    .receiver-section {
+        padding: 1.25rem;
     }
 }

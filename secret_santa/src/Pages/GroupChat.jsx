@@ -1163,6 +1163,8 @@ const GroupChat = () => {
 									style={{
 										padding: "1rem",
 										backgroundColor: "rgba(244, 244, 244, 0.7)",
+										maxHeight: "400px",
+										overflowY: "auto",
 									}}
 								>
 									<MyAssignmentCard roomId={roomId} />
