@@ -15,6 +15,16 @@ const InviteModal = ({ isOpen, onClose, roomId, roomName }) => {
 	const [copied, setCopied] = useState(false);
 	const [linkCopied, setLinkCopied] = useState(false);
 
+	// Define handleClose first before it's used in useEffect
+	const handleClose = React.useCallback(() => {
+		setEmailForm({ emails: "", message: "" });
+		setEmailError("");
+		setEmailSuccess("");
+		setCopied(false);
+		setLinkCopied(false);
+		onClose();
+	}, [onClose]);
+
 	// Fetch invite code when modal opens
 	useEffect(() => {
 		const fetchInviteCode = async () => {
@@ -122,15 +132,6 @@ const InviteModal = ({ isOpen, onClose, roomId, roomName }) => {
 			setSendingEmail(false);
 		}
 	};
-
-	const handleClose = React.useCallback(() => {
-		setEmailForm({ emails: "", message: "" });
-		setEmailError("");
-		setEmailSuccess("");
-		setCopied(false);
-		setLinkCopied(false);
-		onClose();
-	}, [onClose]);
 
 	if (!isOpen) return null;
 

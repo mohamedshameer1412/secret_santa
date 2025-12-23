@@ -143,6 +143,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				title: "Access Denied",
 				text: "Only the organizer can draw names",
 				confirmButtonColor: "#cc0000",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 			return;
 		}
@@ -153,6 +156,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				title: "Not Enough Participants",
 				text: "You need at least 3 participants to draw names",
 				confirmButtonColor: "#cc0000",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 			return;
 		}
@@ -167,6 +173,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 			cancelButtonColor: "#6c757d",
 			confirmButtonText: '<i class="fas fa-magic"></i> Draw Names',
 			cancelButtonText: "Cancel",
+			customClass: {
+				container: "swal-z-index-high",
+			},
 		});
 
 		if (!result.isConfirmed) return;
@@ -180,7 +189,15 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);
 
-			setRoomStatus("drawn");
+			// Refresh room data from backend to get updated status
+			const roomResponse = await axios.get(
+				`http://localhost:5000/api/chat/${roomId}`,
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+
+			const room = roomResponse.data.room || roomResponse.data;
+			setRoomStatus(room.status || "drawn");
+			setParticipants(room.participants || []);
 
 			Swal.fire({
 				icon: "success",
@@ -198,6 +215,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
         `,
 				confirmButtonColor: "#2d5016",
 				confirmButtonText: "Perfect!",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 		} catch (error) {
 			Swal.fire({
@@ -207,6 +227,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 					error.response?.data?.message ||
 					"Could not draw names. Please try again.",
 				confirmButtonColor: "#cc0000",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 		} finally {
 			setDrawing(false);
@@ -256,18 +279,26 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 					title: "Invalid Assignments",
 					text: errorMessage,
 					confirmButtonColor: "#cc0000",
+					customClass: {
+						container: "swal-z-index-high",
+					},
 				});
+				setDrawing(false);
 				return;
 			}
 
-			// Validate all participants are assigned as receivers
+			// Check if all participants are assigned as receivers
 			if (receiverIds.size !== participants.length) {
 				await Swal.fire({
 					icon: "error",
 					title: "Incomplete Assignments",
 					text: "All participants must be assigned as recipients",
 					confirmButtonColor: "#cc0000",
+					customClass: {
+						container: "swal-z-index-high",
+					},
 				});
+				setDrawing(false);
 				return;
 			}
 
@@ -283,9 +314,12 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				title: "Assignments Saved!",
 				text: "Manual pairings have been successfully saved. Participants can now view their assignments.",
 				confirmButtonColor: "#2d5016",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 
-			// Refresh room data
+			// Refresh room data to get updated status
 			const response = await axios.get(
 				`http://localhost:5000/api/chat/${roomId}`,
 				{ headers: { Authorization: `Bearer ${token}` } }
@@ -303,6 +337,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 					error.response?.data?.message ||
 					"Could not save manual assignments. Please try again.",
 				confirmButtonColor: "#cc0000",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 		} finally {
 			setDrawing(false);
@@ -342,6 +379,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 			cancelButtonColor: "#6c757d",
 			confirmButtonText: "Yes, Reset",
 			cancelButtonText: "Cancel",
+			customClass: {
+				container: "swal-z-index-high",
+			},
 		});
 
 		if (!result.isConfirmed) return;
@@ -354,20 +394,34 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);
 
+			// Refresh room data to get updated status
+			const roomResponse = await axios.get(
+				`http://localhost:5000/api/chat/${roomId}`,
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+
+			const room = roomResponse.data.room || roomResponse.data;
+			setRoomStatus(room.status || "waiting");
+			setParticipants(room.participants || []);
+
 			Swal.fire({
 				icon: "success",
 				title: "Assignments Reset",
 				text: "All Secret Santa assignments have been cleared.",
 				confirmButtonColor: "#2d5016",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
-
-			setRoomStatus("waiting");
 		} catch (error) {
 			Swal.fire({
 				icon: "error",
 				title: "Reset Failed",
 				text: error.response?.data?.message || "Failed to reset assignments",
 				confirmButtonColor: "#cc0000",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 		}
 	};
@@ -392,6 +446,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 					return 'You must type "DELETE" to confirm';
 				}
 			},
+			customClass: {
+				container: "swal-z-index-high",
+			},
 		});
 
 		if (!result.isConfirmed) return;
@@ -408,6 +465,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				title: "Room Deleted",
 				text: "The room has been permanently deleted.",
 				confirmButtonColor: "#2d5016",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 
 			// Stay on current page - detect if we're on dashboard or group-chat
@@ -423,6 +483,9 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 				title: "Delete Failed",
 				text: error.response?.data?.message || "Failed to delete room",
 				confirmButtonColor: "#cc0000",
+				customClass: {
+					container: "swal-z-index-high",
+				},
 			});
 		}
 	};
@@ -1066,7 +1129,8 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 															<p className='draw-description'>
 																Ready to assign Secret Santa pairs? This will
 																randomly match each participant with someone to
-																gift to.
+																gift to. Once drawn, assignments are permanent
+																until you reset them.
 															</p>
 															<button
 																className='btn-draw-names'
@@ -1097,7 +1161,8 @@ const RoomSettingsModal = ({ isOpen, onClose, roomId }) => {
 															<i className='fas fa-check-circle'></i>
 															<p>
 																Names have been drawn! Participants can now view
-																their assignments.
+																their assignments. Assignments will remain the
+																same unless you use "Reset Assignments" below.
 															</p>
 														</div>
 													)}

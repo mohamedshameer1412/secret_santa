@@ -1032,3 +1032,12 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* SweetAlert2 z-index override to appear above modal */
+.swal-z-index-high {
+  z-index: 10000 !important;
+}
+
+.swal-z-index-high .swal2-container {
+  z-index: 10000 !important;
+}

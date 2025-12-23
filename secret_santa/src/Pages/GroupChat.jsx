@@ -552,6 +552,7 @@ const GroupChat = () => {
 			userScrolledUp.current = false;
 
 			fetchMessages();
+			fetchRooms(); // Update room list to reflect new message
 		} catch (error) {
 			console.error("Error uploading file:", error);
 			console.error("Error response:", error.response?.data);
@@ -651,6 +652,8 @@ const GroupChat = () => {
 				});
 
 				fetchMessages();
+				// Update room list as last message may have changed
+				fetchRooms();
 			} catch (error) {
 				console.error("Error deleting message:", error);
 				Swal.fire({
@@ -677,6 +680,7 @@ const GroupChat = () => {
 			);
 
 			fetchMessages();
+			fetchRooms(); // Update room list to reflect activity
 			setShowReactionPicker(null);
 		} catch (error) {
 			console.error("Error adding reaction:", error);
@@ -1009,15 +1013,16 @@ const GroupChat = () => {
 		return () => window.removeEventListener("resize", handleResize);
 	}, []);
 
-	// Poll for new messages every 3 seconds
+	// Poll for new messages every 3 seconds and update room list
 	useEffect(() => {
 		if (!user || !roomId) return;
 
 		const interval = setInterval(() => {
 			fetchMessages();
+			fetchRooms(); // Refresh room list to update lastMessage timestamps for sorting
 		}, 3000);
 		return () => clearInterval(interval);
-	}, [roomId, fetchMessages, user]);
+	}, [roomId, fetchMessages, fetchRooms, user]);
 
 	if (loading || authLoading) {
 		return (
